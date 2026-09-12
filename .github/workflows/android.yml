@@ -1,0 +1,83 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug-apk:
+    name: Assemble debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # AGP 8.5.2 需要 compileSdk 34 / Build-Tools 34.0.0
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      # 本仓库未提交 gradle-wrapper.jar，因此不使用 ./gradlew，
+      # 改为安装 gradle-wrapper.properties 声明的同一版本，保持单一事实来源。
+      - name: Resolve Gradle version
+        id: gradle-version
+        run: |
+          set -euo pipefail
+          v=$(sed -nE 's|^distributionUrl=.*gradle-(.+)-[a-z]+\.zip.*$|\1|p' gradle/wrapper/gradle-wrapper.properties)
+          test -n "$v" || { echo '无法从 gradle-wrapper.properties 解析 Gradle 版本' >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "使用 Gradle $v"
+
+      - name: Install Gradle
+        env:
+          GRADLE_VERSION: ${{ steps.gradle-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          unzip -q /tmp/gradle.zip -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Show toolchain
+        run: |
+          java -version
+          gradle --version
+
+      - name: Assemble debug APK
+        run: gradle --no-daemon assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-lock-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
