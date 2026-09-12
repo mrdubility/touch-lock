@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">触摸锁</string>
+
+    <!-- 主界面 -->
+    <string name="main_title">触摸锁</string>
+    <string name="main_subtitle">锁定屏幕触摸，防止误触；底层应用保持前台</string>
+    <string name="lock_button">锁定屏幕</string>
+    <string name="permission_button">授予悬浮窗权限</string>
+    <string name="status_ready">已就绪：点击“锁定屏幕”后，可在 3 秒内切换到目标应用</string>
+    <string name="status_need_permission">需要先授予“显示在其他应用上层”权限</string>
+    <string name="countdown">%1$d 秒后锁定，请切换到目标应用…</string>
+
+    <!-- 覆盖层 -->
+    <string name="overlay_hint">触摸已锁定</string>
+    <string name="overlay_unlock">解锁</string>
+    <string name="overlay_doubletap_hint">双击此处解锁</string>
+
+    <!-- 通知 -->
+    <string name="channel_name">触摸锁服务</string>
+    <string name="channel_desc">触摸锁前台服务通知</string>
+    <string name="notify_title">触摸锁已启用</string>
+    <string name="notify_text">双击屏幕中央按钮解锁</string>
+    <string name="notify_unlock">解锁</string>
+</resources>

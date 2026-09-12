@@ -1,0 +1,4 @@
+<resources>
+    <!-- 使用平台主题（无 AndroidX 依赖），配合 android.app.Activity -->
+    <style name="Theme.TouchLock" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>

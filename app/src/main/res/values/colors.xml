@@ -1,0 +1,12 @@
+<resources>
+    <!-- 覆盖层背景：透明，靠窗口 screenBrightness 压暗，底层应用仍可见 -->
+    <color name="overlay_scrim">#00000000</color>
+    <color name="hint_text">#FFFFFFFF</color>
+
+    <!-- 解锁按钮 -->
+    <color name="unlock_button">#FFFFFFFF</color>
+    <color name="unlock_button_text">#FF1A1A1A</color>
+
+    <!-- 自适应启动图标背景 -->
+    <color name="ic_launcher_background">#FF1E88E5</color>
+</resources>
