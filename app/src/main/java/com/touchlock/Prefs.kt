@@ -11,7 +11,9 @@ object Prefs {
     /** 默认倒计时秒数 */
     const val DEFAULT_DELAY = 5
     const val MIN_DELAY = 0
-    const val MAX_DELAY = 60
+
+    /** 上限 30 秒：再长就失去“切过去坐好”的意义，反而容易忘记锁 */
+    const val MAX_DELAY = 30
 
     private const val FILE_NAME = "touch_lock_prefs"
     private const val KEY_DELAY = "lock_delay_seconds"

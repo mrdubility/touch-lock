@@ -17,7 +17,7 @@ import android.widget.TextView
 /**
  * 设置页：
  * 1. 悬浮窗权限状态 + 一键跳系统授权页 + 分厂商路径说明（多条字符串在代码里用换行拼接）；
- * 2. 锁定倒计时秒数（SeekBar 0..60 与 4 个快捷按钮），写入 [Prefs]；
+ * 2. 锁定倒计时秒数（SeekBar 0..30 与 4 个快捷按钮），写入 [Prefs]；
  * 3. 通知权限（仅 Android 13+ 显示），说明它是滑动条之外的备用解锁出口；
  * 4. 能力边界与版本号（只读）。
  *
@@ -77,7 +77,7 @@ class SettingsActivity : Activity() {
         })
 
         findViewById<Button>(R.id.delayNowButton).setOnClickListener { applyDelay(0) }
-        findViewById<Button>(R.id.delay3Button).setOnClickListener { applyDelay(3) }
+        findViewById<Button>(R.id.delay1Button).setOnClickListener { applyDelay(1) }
         findViewById<Button>(R.id.delay5Button).setOnClickListener { applyDelay(5) }
         findViewById<Button>(R.id.delay10Button).setOnClickListener { applyDelay(10) }
     }

@@ -119,6 +119,8 @@ class LockRootLayout @JvmOverloads constructor(
  *    长按屏幕任意位置可临时恢复亮度以便看清滑块，松手重新变暗。
  *
  * 解锁、取消、点通知都会 stopSelf，onDestroy 负责移除全部浮层，亮度随窗口移除自动恢复。
+ * 触发锁定的入口有两个：桌面图标（[MainActivity]）与下拉栏快捷磁贴（[LockTileService]），
+ * 二者都走 startForegroundService 并带上设置里存的倒计时秒数；已处于锁定态时新的锁定请求会被忽略。
  */
 class TouchLockService : Service() {
 
@@ -160,6 +162,11 @@ class TouchLockService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
+        }
+        if (locked) {
+            // 已锁定时忽略新的锁定请求：锁定期间通知栏仍可下拉（覆盖层拦不住系统手势），
+            // 此时再点磁贴/图标会在锁屏之上又叠一层倒计时卡片，属于多余状态
+            return START_NOT_STICKY
         }
         val seconds = intent?.getIntExtra(EXTRA_DELAY_SECONDS, Prefs.DEFAULT_DELAY)
             ?: Prefs.DEFAULT_DELAY
@@ -344,15 +351,16 @@ class TouchLockService : Service() {
             .build()
     }
 
-    /** 锁定阶段的通知：点通知本体即解锁，是滑动条之外的备用出口 */
-    private fun buildLockNotification(): Notification {
-        val unlockIntent = servicePendingIntent(ACTION_UNLOCK, 1)
-        return baseNotificationBuilder(unlockIntent)
+    /**
+     * 锁定阶段的通知：整条通知即解锁入口，不再另设“解锁”按钮。
+     * 点击通知本体已占满通知宽度，再摆一个语义相同的按钮只是噪声；
+     * 倒计时阶段保留“取消”按钮，因为那是一次性、不可逆的放弃动作，值得一个明确入口。
+     */
+    private fun buildLockNotification(): Notification =
+        baseNotificationBuilder(servicePendingIntent(ACTION_UNLOCK, 1))
             .setContentTitle(getString(R.string.notify_title))
             .setContentText(getString(R.string.notify_text))
-            .addAction(buildAction(R.string.notify_unlock, unlockIntent))
             .build()
-    }
 
     /**
      * contentIntent 直接绑定解锁/取消：点图标已是“直接开始锁定”，

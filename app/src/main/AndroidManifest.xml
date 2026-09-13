@@ -14,6 +14,8 @@
       以上 4 项即全部。本项目不申请：剪贴板读写、传感器/设备动作方向、
       安装快捷方式（桌面长按快捷方式用 res/xml/shortcuts.xml 静态声明，无需权限）、
       读取应用列表（QUERY_ALL_PACKAGES）、定位、相机、麦克风、通讯录等。
+      下拉栏快捷磁贴也不增加 uses-permission：BIND_QUICK_SETTINGS_TILE 是加在
+      <service> 上供系统绑定的权限，不是应用自行申请的。
     -->
 
     <application
@@ -55,6 +57,22 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="touch_lock_overlay" />
+        </service>
+
+        <!--
+          下拉栏快捷磁贴：点一下即开始倒数锁定，等同于点桌面图标。
+          必须 exported=true 且由系统凭 BIND_QUICK_SETTINGS_TILE 绑定，外部应用无法直接唤起。
+          icon 复用通知栏的白底锁剪影：磁贴与通知小图标同样要求白色单色 + 透明底，系统会自行着色。
+        -->
+        <service
+            android:name=".LockTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_notification"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
         </service>
 
     </application>

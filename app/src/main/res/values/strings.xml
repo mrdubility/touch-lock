@@ -1,6 +1,9 @@
 <resources>
     <string name="app_name">触摸锁</string>
 
+    <!-- 下拉栏快捷磁贴（TileService） -->
+    <string name="tile_label">触摸锁</string>
+
     <!-- 桌面长按快捷方式 -->
     <string name="shortcut_settings_short">设置</string>
     <string name="shortcut_settings_long">打开触摸锁设置</string>
@@ -33,7 +36,6 @@
     <string name="notify_countdown_text">%1$d 秒后锁定，点通知即可取消</string>
     <string name="notify_title">触摸锁已启用</string>
     <string name="notify_text">点通知直接解锁，或拖动屏幕上的滑块</string>
-    <string name="notify_unlock">解锁</string>
     <string name="notify_cancel">取消</string>
 
     <!-- 设置页 -->
@@ -53,11 +55,14 @@
     <string name="settings_delay_title">锁定倒计时</string>
     <string name="settings_delay_value">%1$d 秒后锁定</string>
     <string name="settings_delay_zero">立即锁定</string>
-    <string name="settings_delay_hint">点桌面图标后等待的秒数，期间可切换到要保护的应用；0 表示立即锁定</string>
+    <string name="settings_delay_hint">点桌面图标或下拉栏磁贴后等待的秒数（0–30 可调），期间可切换到要保护的应用；0 表示立即锁定</string>
     <string name="settings_delay_now">立即</string>
-    <string name="settings_delay_3">3 秒</string>
+    <string name="settings_delay_1">1 秒</string>
     <string name="settings_delay_5">5 秒</string>
     <string name="settings_delay_10">10 秒</string>
+
+    <string name="settings_reenter_title">如何再回到设置页</string>
+    <string name="settings_reenter_body">悬浮窗权限已开启时，点桌面图标会直接开始倒数锁定，不再进入本页。想改设置可以用这两条路径：\n1. 桌面长按「触摸锁」图标 &gt; 点「设置」快捷方式（最快）\n2. 点图标后在顶部倒计时卡片上点齿轮（会顺带取消本次锁定）\n若悬浮窗权限被关掉，点图标会先进引导页，页内同样有「设置」按钮。</string>
 
     <string name="settings_notify_title">通知权限</string>
     <string name="settings_notify_on">已授权</string>
