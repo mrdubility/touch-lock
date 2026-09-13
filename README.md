@@ -49,6 +49,7 @@
 
 ## 版本
 
+- **1.3.1**：点完磁贴自动收起下拉栏（之前面板会挂在锁屏之上，看着像没锁上）。
 - **1.3**：新增下拉栏快捷磁贴；倒计时最长 30 秒；设置页说明如何再次进入。
 - **1.2**：改用正式签名（从这版起可覆盖升级）；滑块下移到四分之三处，手指行程更短；新增长按临时点亮。
 - **1.1**：双击屏幕解锁改为滑动解锁；新增设置页。
@@ -57,6 +58,6 @@
 ## 给开发者
 
 - **构建**：JDK 17 + Android SDK 34（build-tools 34.0.0）。仓库未提交 `gradle-wrapper.jar`，本机用 `gradle assembleDebug` 或 Android Studio 直接构建。
-- **发版**：版本号同时写在 `app/build.gradle.kts`（`versionCode` / `versionName`）和 `.github/workflows/android.yml` 的 `EXPECTED_VERSION_NAME`（两处不一致会构建失败），然后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 只构建 debug 包验证可编译，不发布。
+- **发版**：版本号只写在 `app/build.gradle.kts`（`versionCode` 递增以允许覆盖安装，`versionName` 是人读的版本号）；标签名决定 Release 标题与产物名 `touch-lock-<tag>-release.apk`。改完提交后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 只构建 debug 包验证可编译，不发布。
 - **签名密钥**：`keystore/` 整个目录被 `.gitignore` 忽略，密钥库与密码只存在本机，CI 靠 GitHub Secrets（`KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`）还原。**务必自行备份 keystore 和密码**：一旦丢失，老用户无法覆盖升级，只能卸载重装。
 - **代码**：Kotlin，零 AndroidX 依赖（仅平台 API + Kotlin stdlib），源码在 `app/src/main/java/com/touchlock/`。锁定层是 `TYPE_APPLICATION_OVERLAY` 全宽覆盖层，触摸在 `dispatchTouchEvent` 层消费、返回键被吞；前台服务用 `specialUse` 类型以免被厂商 ROM 识别为锁屏类强杀。
