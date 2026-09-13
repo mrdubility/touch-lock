@@ -131,6 +131,13 @@ class TouchLockService : Service() {
 
         /** 锁定态亮度：0.0 = 最暗（个别 ROM 不生效可改 0.01f） */
         private const val DIM_BRIGHTNESS = 0.0f
+
+        /**
+         * 长按点亮时的亮度：-1.0f = 跟随系统默认亮度。
+         * 对应 AOSP 的 SCREEN_BRIGHTNESS_DEFAULT，但该常量是 @hide 的，
+         * 公开 SDK 只有 SCREEN_BRIGHTNESS_OVERRIDE_OFF / _FULL，因此只能自己写数值。
+         */
+        private const val FOLLOW_SYSTEM_BRIGHTNESS = -1.0f
     }
 
     private lateinit var windowManager: WindowManager
@@ -261,13 +268,7 @@ class TouchLockService : Service() {
         // 长按屏幕任意位置（含滑块上）临时恢复亮度，便于看清滑块位置；松手压回最暗
         val peekHint = view.findViewById<TextView>(R.id.peekHintText)
         view.onBrightnessPeek = { peek ->
-            applyScreenBrightness(
-                if (peek) {
-                    WindowManager.LayoutParams.SCREEN_BRIGHTNESS_DEFAULT
-                } else {
-                    DIM_BRIGHTNESS
-                }
-            )
+            applyScreenBrightness(if (peek) FOLLOW_SYSTEM_BRIGHTNESS else DIM_BRIGHTNESS)
             peekHint.setText(
                 if (peek) R.string.overlay_peek_active else R.string.overlay_peek_hint
             )
