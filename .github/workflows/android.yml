@@ -17,8 +17,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-debug-apk:
-    name: Assemble debug APK
+  build-apk:
+    name: Assemble APK (tags 额外产出正式签名 release)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -76,7 +76,7 @@ jobs:
       - name: Assemble debug APK
         run: gradle --no-daemon assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: touch-lock-debug-apk
@@ -84,7 +84,59 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # 仅当本次运行由 v* 标签推送触发时，把 APK 发布成 GitHub Release
+      # ================= 以下仅在 v* 标签推送时执行 =================
+      # 签名密钥不入库：由 GitHub Secrets 提供，临时还原到 runner 上，用完随虚拟机一起销毁
+
+      - name: Restore release keystore from secrets
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "缺少 GitHub Secrets：KEYSTORE_BASE64 / KEYSTORE_PASSWORD" >&2
+            echo "请到 仓库 Settings > Secrets and variables > Actions 添加后重跑本 workflow" >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/keystore/touch-lock-release.jks"
+          {
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/keystore/touch-lock-release.jks"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "keystore 已还原：$(wc -c < "$RUNNER_TEMP/keystore/touch-lock-release.jks") bytes"
+
+      - name: Assemble signed release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: gradle --no-daemon assembleRelease --stacktrace
+
+      # 硬验签：万一签名链路静默失效（产出未签名 APK），在此处直接失败而不是发到 Release 上
+      - name: Verify release APK signature
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          set -euo pipefail
+          apk=app/build/outputs/apk/release/app-release.apk
+          signer="$(for d in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/.android/sdk" /usr/local/lib/android/sdk; do
+            { [ -n "$d" ] && [ -d "$d" ]; } || continue
+            find "$d" -maxdepth 3 -type f -name apksigner 2>/dev/null || true
+          done | sort -V | tail -1)"
+          if [ -z "$signer" ]; then
+            echo "找不到 apksigner，无法确认 APK 已签名" >&2
+            exit 1
+          fi
+          sh "$signer" verify --print-certs -v "$apk"
+
+      - name: Upload release APK
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-lock-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # 仅当本次运行由 v* 标签推送触发时，把正式签名 APK 发布成 GitHub Release
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -92,13 +144,19 @@ jobs:
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          apk="touch-lock-${tag}-debug.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "$apk"
+          apk="touch-lock-${tag}-release.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          {
+            echo "正式签名（自管 release key）的 release APK，可直接安装，后续版本覆盖升级无需卸载。"
+            echo ""
+            echo "- 点桌面图标 -> 顶部倒计时卡片（默认 5 秒，设置里可调 0–60 秒）-> 全屏锁定"
+            echo "- 解锁：按住屏幕中央滑块向右拖到底；通知栏“解锁”为备用出口"
+            echo "- 长按桌面图标可直接进入设置页"
+            echo "- 若之前装过 debug 版：两者签名不同，需先卸载一次再装本包"
+          } > notes.md
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag 已存在，覆盖上传产物"
             gh release upload "$tag" "$apk" --clobber
           else
-            gh release create "$tag" "$apk" \
-              --title "触摸锁 ${tag}" \
-              --notes "debug 签名，可直接安装。授予悬浮窗权限后点锁定屏幕，双击中央按钮解锁。"
+            gh release create "$tag" "$apk" --title "触摸锁 ${tag}" --notes-file notes.md
           fi

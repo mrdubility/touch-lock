@@ -17,10 +17,18 @@
 
 最低 Android 8.0（API 26）。
 
-- 直接下载安装：https://github.com/mrdubility/touch-lock/releases/latest
-- 本地构建（需 Android Studio 或 JDK 17 + SDK 34）：`Build > Build App Bundle(s) / APK(s) > Build APK(s)`，产物在 `app/build/outputs/apk/debug/app-debug.apk`。
+- 直接下载安装：https://github.com/mrdubility/touch-lock/releases/latest —— 页面里的 `touch-lock-v<版本>-release.apk` 即正式签名包。
+- 本地构建（需 Android Studio 或 JDK 17 + SDK 34）：`Build > Build App Bundle(s) / APK(s) > Build APK(s)`，产物在 `app/build/outputs/apk/debug/app-debug.apk`；`gradle assembleRelease` 在能读到签名材料时产出签名版 release APK。
 
 首次运行需授予"显示在其他应用上层"权限：点图标会出现引导页，设置页也提供一键跳转与各品牌路径。
+
+## 签名
+
+- Release 包用自管的正式签名密钥（`keystore/touch-lock-release.jks`，RSA 2048 / SHA256withRSA，有效期至 2056 年）签名，别名 `touch-lock`。**密钥库与密码不入库**（`.gitignore` 忽略 `/keystore/`），CI 从 GitHub Secrets 还原后临时签名，runner 销毁即消失。
+- 需要配置的 Secrets 只有两个：`KEYSTORE_BASE64`（密钥库的 base64）与 `KEYSTORE_PASSWORD`。缺失时 tag 构建会明确失败，不会静默发布未签名包（另有 apksigner 硬验签一步）。
+- 从 debug 包换到 release 包、或从 v1.0/v1.1.0 的 debug 包升级，都会因签名不同而报"与已安装应用签名冲突"，**先卸载一次**再装 release 包即可；此后各版本之间可正常覆盖升级。
+- 历史版本的 debug 包签名互不相同，是因为每次 CI 构建都在全新 runner 上自动生成一份临时 `~/.android/debug.keystore`，这属于 debug 签名的固有行为，不是本项目的 bug。
+- **务必备份 `keystore/` 目录与密码**：丢失后无法用同一签名继续发版，老用户只能卸载重装。若将来上架 Google Play，可把这份密钥作为 upload key，或直接改用 Play App Signing 托管。
 
 ## 权限清单（共 4 项，全部为功能必需）
 
@@ -86,9 +94,11 @@ app/src/main/
 
 ## CI / 发版
 
-- push 到 `main`：GitHub Actions 自动构建 debug APK 并上传为构建产物。
-- push `v*` 标签：自动创建 GitHub Release 并附上 `touch-lock-<tag>-debug.apk`。
-- 仓库未提交 `gradle-wrapper.jar`，CI 会从 `gradle/wrapper/gradle-wrapper.properties` 解析版本号后安装同版本 Gradle，再执行 `gradle assembleDebug`。详见 `.github/workflows/android.yml`。
+- push 到 `main`：GitHub Actions 自动构建 debug APK 并上传为构建产物（仅用于验证能编过，不作为发布物）。
+- push `v*` 标签：额外执行 `assembleRelease` 用正式密钥签名 → `apksigner verify` 校验 → 自动创建 GitHub Release 并附上 `touch-lock-<tag>-release.apk`。
+- 仓库未提交 `gradle-wrapper.jar`，CI 会从 `gradle/wrapper/gradle-wrapper.properties` 解析版本号后安装同版本 Gradle，再执行 `gradle assembleDebug/assembleRelease`。详见 `.github/workflows/android.yml`。
+
+本地构建 release 包：把 `keystore/touch-lock-release.jks` 与 `keystore/keystore.properties`（含 `storePassword`）放在仓库根目录的 `keystore/` 下即可被自动读取，无需设置环境变量。
 
 发版：
 
@@ -99,5 +109,6 @@ git push origin v1.2.0
 
 ## 版本历史
 
+- **1.1.1**（versionCode 3）：改用正式签名密钥发布 release APK，解决"与已安装应用签名冲突"（历史 debug 包每次 CI 都换签名）；Release 文案同步为滑动解锁。
 - **1.1**（versionCode 2）：解锁方式由双击改为滑动条（防误触）；新增设置页与可调倒计时；点图标直接倒数锁定；新增长按图标进设置的快捷方式；倒计时改为顶部小卡片，期间可自由切换应用。
 - **1.0**：首个版本，悬浮窗锁定 + 最低亮度 + 双击解锁。

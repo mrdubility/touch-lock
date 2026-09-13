@@ -8,3 +8,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# 正式签名材料：密钥库与密码一律不入库（CI 从 GitHub Secrets 还原）
+/keystore/
+*.jks
+*.keystore
+*.p12
