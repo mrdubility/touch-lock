@@ -14,17 +14,18 @@ import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
 import android.util.AttributeSet
-import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
+import kotlin.math.abs
 
 /**
  * 覆盖层根布局，承担三件事：
@@ -32,8 +33,10 @@ import android.widget.TextView
  * 2. clickable 消费所有触摸，使事件不下传到底层应用；
  * 3. 在 dispatchTouchEvent 里“旁听”手势：长按屏幕任意位置（含滑块上）临时恢复亮度，
  *    松手压回最暗 —— 解决最低背光下看不清滑块的问题。
- *    旁听而非拦截：事件照常交给子 View，滑动解锁不受影响；移动超过 touchSlop 时
- *    GestureDetector 不会触发长按，因此拖动滑块不会误亮屏。
+ *    旁听而非拦截：事件照常交给子 View，滑动解锁不受影响；移动超过 touchSlop 即取消
+ *    长按计时，因此拖动滑块不会误亮屏。手写计时而不用 GestureDetector，是因为
+ *    SimpleOnGestureListener 同时实现 OnGestureListener 与 OnDoubleTapListener，
+ *    在 Kotlin 里会造成 GestureDetector 构造函数的重载歧义。
  */
 class LockRootLayout @JvmOverloads constructor(
     context: Context,
@@ -44,16 +47,12 @@ class LockRootLayout @JvmOverloads constructor(
     /** 亮度临时恢复回调：true = 长按中（恢复亮度），false = 松手（压回最暗） */
     var onBrightnessPeek: ((Boolean) -> Unit)? = null
 
+    private val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var peeking = false
-
-    private val longPressDetector = GestureDetector(
-        context,
-        object : GestureDetector.SimpleOnGestureListener() {
-            override fun onLongPress(e: MotionEvent) {
-                startPeek()
-            }
-        }
-    )
+    private var downX = 0f
+    private var downY = 0f
+    private val peekRunnable = Runnable { startPeek() }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
@@ -63,11 +62,38 @@ class LockRootLayout @JvmOverloads constructor(
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        longPressDetector.onTouchEvent(event)
         when (event.actionMasked) {
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopPeek()
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                postDelayed(peekRunnable, longPressTimeout)
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) {
+                    cancelPeekTimer()
+                }
+            }
+
+            // 多指按下时不点亮，避免与系统多指手势语义冲突
+            MotionEvent.ACTION_POINTER_DOWN -> cancelPeekTimer()
+
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                cancelPeekTimer()
+                stopPeek()
+            }
         }
         return super.dispatchTouchEvent(event)
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelPeekTimer()
+        stopPeek()
+        super.onDetachedFromWindow()
+    }
+
+    private fun cancelPeekTimer() {
+        removeCallbacks(peekRunnable)
     }
 
     private fun startPeek() {

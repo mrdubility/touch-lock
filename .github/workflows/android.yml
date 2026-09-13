@@ -74,7 +74,9 @@ jobs:
           gradle --version
 
       - name: Assemble debug APK
-        run: gradle --no-daemon assembleDebug --stacktrace
+        run: |
+          set -euo pipefail
+          gradle --no-daemon assembleDebug --stacktrace 2>&1 | tee /tmp/gradle-debug.log
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -109,7 +111,9 @@ jobs:
 
       - name: Assemble signed release APK
         if: startsWith(github.ref, 'refs/tags/v')
-        run: gradle --no-daemon assembleRelease --stacktrace
+        run: |
+          set -euo pipefail
+          gradle --no-daemon assembleRelease --stacktrace 2>&1 | tee /tmp/gradle-release.log
 
       # 硬验签：万一签名链路静默失效（产出未签名 APK），在此处直接失败而不是发到 Release 上
       - name: Verify release APK signature
@@ -160,3 +164,27 @@ jobs:
           else
             gh release create "$tag" "$apk" --title "触摸锁 ${tag}" --notes-file notes.md
           fi
+
+      # 构建失败时把关键错误行发成 commit comment：公开仓库的 comment 可免鉴权读取，
+      # 而 Actions 日志接口需要 token，没有这一步就只能盲猜编译错误。
+      - name: Report failure as commit comment
+        if: failure() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          {
+            echo "### CI 失败摘要（run ${GITHUB_RUN_ID} / ${GITHUB_REF_NAME}）"
+            echo '```'
+            cat /tmp/gradle-debug.log /tmp/gradle-release.log 2>/dev/null \
+              | grep -E '^(e: |w: |error:|FAILURE|What went wrong|Execution failed|Caused by:|> Task .* FAILED|\* Try|\* Where|A problem occurred)' \
+              | head -60
+            echo '```'
+          } > /tmp/report.md
+          head -c 4000 /tmp/report.md > /tmp/report-trim.md
+          jq -Rs '{body: .}' /tmp/report-trim.md > /tmp/payload.json
+          curl -sS -o /tmp/resp.json -w 'comment http=%{http_code}\n' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" \
+            --data-binary @/tmp/payload.json || true
