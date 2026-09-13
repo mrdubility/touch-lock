@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  设置页：ScrollView + 垂直 LinearLayout + 6 张卡片（卡片样式见 themes.xml 的 SettingsCard）。
+  设置页：ScrollView + 垂直 LinearLayout + 7 张卡片（卡片样式见 themes.xml 的 SettingsCard）。
   全部使用平台控件，不引入 AndroidX / Material Components。
   文案中带 id 的控件由 SettingsActivity 在运行时填充。
 -->
@@ -175,7 +175,59 @@
 
         </LinearLayout>
 
-        <!-- 卡片 5：能力边界（只读说明） -->
+        <!--
+          卡片 5：抽屉守卫（可选的无障碍功能，仅 Android 12+ 显示，由代码控制 visibility）
+          开与不开的代价写在卡片里，让用户自己判断值不值得为了拦下拉栏去授予无障碍权限。
+        -->
+        <LinearLayout
+            android:id="@+id/guardCard"
+            style="@style/SettingsCard"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/SettingsCardTitle"
+                android:text="@string/settings_guard_title" />
+
+            <TextView
+                android:id="@+id/guardStatusText"
+                style="@style/SettingsCardBody"
+                android:textColor="@color/settings_text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <Switch
+                android:id="@+id/guardSwitch"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/settings_guard_switch" />
+
+            <TextView
+                style="@style/SettingsCardBody"
+                android:text="@string/settings_guard_diff_title" />
+
+            <TextView
+                android:id="@+id/guardDiffText"
+                style="@style/SettingsCardBody" />
+
+            <TextView
+                style="@style/SettingsCardBody"
+                android:text="@string/settings_guard_cost_title" />
+
+            <TextView
+                android:id="@+id/guardCostText"
+                style="@style/SettingsCardBody" />
+
+            <Button
+                android:id="@+id/guardGoButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/settings_guard_go" />
+
+        </LinearLayout>
+
+        <!-- 卡片 6：能力边界（只读说明） -->
         <LinearLayout style="@style/SettingsCard">
 
             <TextView
@@ -188,7 +240,7 @@
 
         </LinearLayout>
 
-        <!-- 卡片 6：关于 -->
+        <!-- 卡片 7：关于 -->
         <LinearLayout style="@style/SettingsCard">
 
             <TextView

@@ -153,13 +153,21 @@ class TouchLockService : Service() {
          * 结果就是“按了半天亮得又慢又暗”。显式 1.0f 锁定的是本窗口的背光，不依赖系统状态。
          */
         private const val PEEK_BRIGHTNESS = 1.0f
+
+        /**
+         * 是否处于锁定态，供 [ShadeGuardService] 判定“现在该不该关抽屉”。
+         *
+         * 用进程内共享标志而不是 bindService：守卫服务由系统常驻绑定，生命周期与锁定无关，
+         * 为它维持一次绑定反而更脆弱。两者同进程，回调也都在主线程。
+         */
+        @Volatile
+        var isLocked: Boolean = false
     }
 
     private lateinit var windowManager: WindowManager
     private var countdownView: View? = null
     private var lockView: View? = null
     private var countDownTimer: CountDownTimer? = null
-    private var locked = false
 
     override fun onCreate() {
         super.onCreate()
@@ -176,8 +184,8 @@ class TouchLockService : Service() {
                 return START_NOT_STICKY
             }
         }
-        if (locked) {
-            // 已锁定时忽略新的锁定请求：锁定期间通知栏仍可下拉（覆盖层拦不住系统手势），
+        if (isLocked) {
+            // 已锁定时忽略新的锁定请求：没开抽屉守卫时锁定期间通知栏仍可下拉，
             // 此时再点磁贴/图标会在锁屏之上又叠一层倒计时卡片，属于多余状态
             return START_NOT_STICKY
         }
@@ -270,9 +278,9 @@ class TouchLockService : Service() {
         countDownTimer?.cancel()
         countDownTimer = null
         removeCountdown()
-        if (!locked) {
+        if (!isLocked) {
             showLock()
-            locked = true
+            isLocked = true
         }
         notifyState(buildLockNotification())
     }
@@ -325,7 +333,7 @@ class TouchLockService : Service() {
     private fun removeLock() {
         lockView?.let { v -> runCatching { windowManager.removeView(v) } }
         lockView = null
-        locked = false
+        isLocked = false
     }
 
     // ---------- 前台服务与通知 ----------
@@ -372,7 +380,16 @@ class TouchLockService : Service() {
     private fun buildLockNotification(): Notification =
         baseNotificationBuilder(servicePendingIntent(ACTION_UNLOCK, 1))
             .setContentTitle(getString(R.string.notify_title))
-            .setContentText(getString(R.string.notify_text))
+            // 开了抽屉守卫后抽屉会被立即关闭，“点通知解锁”这条路实际用不上，文案如实说明
+            .setContentText(
+                getString(
+                    if (ShadeGuardService.isActive(this)) {
+                        R.string.notify_text_guard
+                    } else {
+                        R.string.notify_text
+                    }
+                )
+            )
             .build()
 
     /**

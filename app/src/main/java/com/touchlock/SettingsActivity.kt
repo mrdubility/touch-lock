@@ -2,6 +2,7 @@ package com.touchlock
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -12,6 +13,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
 
 /**
@@ -19,7 +21,8 @@ import android.widget.TextView
  * 1. 悬浮窗权限状态 + 一键跳系统授权页 + 分厂商路径说明（多条字符串在代码里用换行拼接）；
  * 2. 锁定倒计时秒数（SeekBar 0..30 与 4 个快捷按钮），写入 [Prefs]；
  * 3. 通知权限（仅 Android 13+ 显示），说明它是滑动条之外的备用解锁出口；
- * 4. 能力边界与版本号（只读）。
+ * 4. 抽屉守卫（仅 Android 12+ 显示），把开与不开的代价写清楚，由用户自己决定要不要用；
+ * 5. 能力边界与版本号（只读）。
  *
  * 权限状态在 onResume 刷新，从系统设置页返回后立刻能看到最新结果。
  */
@@ -32,6 +35,10 @@ class SettingsActivity : Activity() {
     private lateinit var notifyCard: LinearLayout
     private lateinit var notifyStatusText: TextView
     private lateinit var notifyGoButton: Button
+    private lateinit var guardCard: LinearLayout
+    private lateinit var guardStatusText: TextView
+    private lateinit var guardSwitch: Switch
+    private lateinit var guardGoButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +51,10 @@ class SettingsActivity : Activity() {
         notifyCard = findViewById(R.id.notifyCard)
         notifyStatusText = findViewById(R.id.notifyStatusText)
         notifyGoButton = findViewById(R.id.notifyGoButton)
+        guardCard = findViewById(R.id.guardCard)
+        guardStatusText = findViewById(R.id.guardStatusText)
+        guardSwitch = findViewById(R.id.guardSwitch)
+        guardGoButton = findViewById(R.id.guardGoButton)
 
         findViewById<TextView>(R.id.overlayPathsText).text = vendorOverlayPaths()
         findViewById<TextView>(R.id.aboutVersionText).text =
@@ -52,6 +63,7 @@ class SettingsActivity : Activity() {
         overlayGoButton.setOnClickListener { openOverlayPermissionSettings() }
         notifyGoButton.setOnClickListener { requestNotificationPermission() }
         setupDelayControls()
+        setupGuardControls()
     }
 
     override fun onResume() {
@@ -115,15 +127,80 @@ class SettingsActivity : Activity() {
         } else {
             notifyCard.visibility = View.GONE
         }
+
+        refreshGuardState()
+    }
+
+    /**
+     * 抽屉守卫的状态行要把两件事分开说清楚：本页的开关只是“用户想不想用”，
+     * 真正生效还得在系统无障碍页面里启用服务 —— 只看开关会误以为已经生效。
+     */
+    private fun refreshGuardState() {
+        // Android 12 以下没有关闭抽屉的 global action，整张卡片不显示（与通知权限卡片同样处理）
+        if (!ShadeGuardService.SUPPORTED) {
+            guardCard.visibility = View.GONE
+            return
+        }
+        guardCard.visibility = View.VISIBLE
+
+        val wanted = Prefs.shadeGuardEnabled(this)
+        // 先比对再赋值：值没变就不触发监听器，避免绕一圈又写回同一个值
+        if (guardSwitch.isChecked != wanted) guardSwitch.isChecked = wanted
+
+        val serviceEnabled = ShadeGuardService.isEnabled(this)
+        guardStatusText.text = getString(
+            when {
+                !wanted -> R.string.settings_guard_status_off
+                !serviceEnabled -> R.string.settings_guard_status_need_service
+                else -> R.string.settings_guard_status_on
+            }
+        )
+        // 只有“用户想用但系统里还没启用”时才需要这个按钮，其它情况下它是噪声
+        guardGoButton.visibility = if (wanted && !serviceEnabled) View.VISIBLE else View.GONE
+    }
+
+    private fun setupGuardControls() {
+        findViewById<TextView>(R.id.guardDiffText).text = joinLines(
+            R.string.settings_guard_diff_off,
+            R.string.settings_guard_diff_on,
+            R.string.settings_guard_diff_same
+        )
+        findViewById<TextView>(R.id.guardCostText).text = joinLines(
+            R.string.settings_guard_cost_warn,
+            R.string.settings_guard_cost_restricted,
+            R.string.settings_guard_cost_rom,
+            R.string.settings_guard_cost_battery
+        )
+        guardSwitch.setOnCheckedChangeListener { _, checked ->
+            Prefs.setShadeGuardEnabled(this, checked)
+            refreshGuardState()
+        }
+        guardGoButton.setOnClickListener { openAccessibilitySettings() }
     }
 
     /** 厂商路径拆成多条单行字符串，在此拼接，避免 strings.xml 里的裸换行被 aapt2 折叠成空格 */
-    private fun vendorOverlayPaths(): String = listOf(
-        getString(R.string.settings_overlay_path_aosp),
-        getString(R.string.settings_overlay_path_miui),
-        getString(R.string.settings_overlay_path_emui),
-        getString(R.string.settings_overlay_path_other)
-    ).joinToString("\n")
+    private fun vendorOverlayPaths(): String = joinLines(
+        R.string.settings_overlay_path_aosp,
+        R.string.settings_overlay_path_miui,
+        R.string.settings_overlay_path_emui,
+        R.string.settings_overlay_path_other
+    )
+
+    private fun joinLines(vararg resIds: Int): String =
+        resIds.joinToString("\n") { getString(it) }
+
+    /**
+     * 跳系统无障碍设置页。EXTRA_FRAGMENT_ARG_KEY 能让原生系统直接定位到本服务那一项；
+     * 定制系统不认这个 extra 时退化成普通列表页，用户自己找「抽屉守卫」。
+     */
+    private fun openAccessibilitySettings() {
+        val target = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).putExtra(
+            Settings.EXTRA_FRAGMENT_ARG_KEY,
+            ComponentName(this, ShadeGuardService::class.java).flattenToString()
+        )
+        runCatching { startActivity(target) }
+            .onFailure { runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) } }
+    }
 
     private fun openOverlayPermissionSettings() {
         startActivity(

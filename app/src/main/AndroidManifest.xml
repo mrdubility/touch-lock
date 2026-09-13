@@ -14,8 +14,11 @@
       以上 4 项即全部。本项目不申请：剪贴板读写、传感器/设备动作方向、
       安装快捷方式（桌面长按快捷方式用 res/xml/shortcuts.xml 静态声明，无需权限）、
       读取应用列表（QUERY_ALL_PACKAGES）、定位、相机、麦克风、通讯录等。
-      下拉栏快捷磁贴也不增加 uses-permission：BIND_QUICK_SETTINGS_TILE 是加在
-      <service> 上供系统绑定的权限，不是应用自行申请的。
+      下面两个服务也不增加 uses-permission：BIND_QUICK_SETTINGS_TILE 与
+      BIND_ACCESSIBILITY_SERVICE 都是加在 <service> 上供系统绑定的权限，不是应用自行申请的。
+      但无障碍不是“轻量权限”：它是系统级最高危权限之一，需用户到系统设置里亲手开启，
+      因此抽屉守卫（ShadeGuardService）默认不启用，能力面在
+      res/xml/shade_guard_service.xml 里压到最小（只监听系统界面、不读内容、不注入手势）。
     -->
 
     <application
@@ -73,6 +76,24 @@
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
+        </service>
+
+        <!--
+          抽屉守卫（可选功能，默认不生效）：锁定期间检测到通知栏 / 控制中心被拉出就立即关闭。
+          必须 exported=true 且由系统凭 BIND_ACCESSIBILITY_SERVICE 绑定，外部应用无法直接唤起。
+          只在 TouchLockService.isLocked 为真时动手，否则用户平时就用不了通知栏。
+        -->
+        <service
+            android:name=".ShadeGuardService"
+            android:exported="true"
+            android:label="@string/guard_a11y_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/shade_guard_service" />
         </service>
 
     </application>

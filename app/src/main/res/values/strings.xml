@@ -36,6 +36,8 @@
     <string name="notify_countdown_text">%1$d 秒后锁定，点通知即可取消</string>
     <string name="notify_title">触摸锁已启用</string>
     <string name="notify_text">点通知直接解锁，或拖动屏幕上的滑块</string>
+    <!-- 开了抽屉守卫后抽屉会被立即关闭，点通知这条路走不通，文案换成如实说明 -->
+    <string name="notify_text_guard">抽屉守卫已开启：请拖动屏幕上的滑块解锁</string>
     <string name="notify_cancel">取消</string>
 
     <!-- 设置页 -->
@@ -70,8 +72,29 @@
     <string name="settings_notify_go">去授权</string>
     <string name="settings_notify_hint">授权后通知栏常驻一条通知，点它就能直接解锁（倒计时阶段为取消），作为滑动条之外的备用出口；未授权时前台服务照常运行，只是通知不展示</string>
 
+    <!-- 抽屉守卫（可选的无障碍功能，默认关闭；卡片仅 Android 12+ 显示） -->
+    <!-- 下面两条是系统无障碍设置页里展示的名称与说明，写给要决定“要不要授予这个权限”的人看 -->
+    <string name="guard_a11y_label">抽屉守卫</string>
+    <string name="guard_a11y_description">仅在触摸锁锁定屏幕期间生效：检测到通知栏或控制中心被拉出时立即将其关闭，避免放在口袋或包里时误触到飞行模式等开关。本服务不读取任何界面内容，也不监听其它应用；未锁定时不做任何事。</string>
+
+    <string name="settings_guard_title">抽屉守卫（可选）</string>
+    <string name="settings_guard_switch">锁定期间自动关闭下拉栏</string>
+    <string name="settings_guard_status_off">未启用（默认）</string>
+    <string name="settings_guard_status_need_service">开关已打开，但系统的无障碍服务还没启用，功能尚未生效</string>
+    <string name="settings_guard_status_on">生效中：锁定期间抽屉一被拉出就关闭</string>
+    <string name="settings_guard_go">去开启无障碍服务</string>
+    <string name="settings_guard_diff_title">开与不开的区别：</string>
+    <string name="settings_guard_diff_off">不开（默认）：只需悬浮窗权限。锁定时通知栏照样能下拉，可以点通知解锁；代价是口袋里的误触可能点中抽屉里的开关（飞行模式、Wi-Fi、录屏等）。</string>
+    <string name="settings_guard_diff_on">开启：额外需要无障碍权限。锁定时抽屉一拉出就被关掉，误触开关的风险基本消除；代价是「点通知解锁」同时失效，解锁只剩屏幕上的滑块。</string>
+    <string name="settings_guard_diff_same">两种情况都拦不住：上滑回桌面、上滑任务中心、侧滑返回。这些系统手势不经过应用层，无障碍也拦不住，它只能事后把抽屉关掉。</string>
+    <string name="settings_guard_cost_title">开启前请知道的代价：</string>
+    <string name="settings_guard_cost_warn">无障碍是 Android 上最高的应用权限之一，系统会弹「可完全控制设备」级别的强警告。本应用已如实声明它不是无障碍工具，并把能力压到最小：读不到界面内容、只监听系统界面（com.android.systemui）的窗口事件、不注入手势。</string>
+    <string name="settings_guard_cost_restricted">Android 13 及以上的侧载应用会被「受限设置」拦住：需先到 设置 &gt; 应用 &gt; 触摸锁 &gt; 右上角菜单 &gt; 允许受限设置，再回无障碍页面开启本服务。</string>
+    <string name="settings_guard_cost_rom">效果取决于系统实现：个别定制系统的抽屉或控制中心不发窗口状态事件，此时守卫不生效（锁定本身不受影响）。装好后请自己下拉一次验证。</string>
+    <string name="settings_guard_cost_battery">无障碍服务由系统常驻绑定，会带来少量额外耗电；未锁定时它收到事件只做一次判断就返回，不执行任何动作。</string>
+
     <string name="settings_limit_title">能力边界</string>
-    <string name="settings_limit_body">可拦截：屏幕内的普通触摸、返回键。\n无法拦截：通知栏下拉、上滑回桌面、上滑任务中心、侧滑返回手势、音量键、电源键。\n原因：系统界面窗口层级高于应用悬浮窗，且全面屏手势由系统直接消费、不产生按键事件，应用层没有可用接口。详见项目 README。</string>
+    <string name="settings_limit_body">可拦截：屏幕内的普通触摸、返回键。\n无法拦截：上滑回桌面、上滑任务中心、侧滑返回手势、音量键、电源键。\n下拉通知栏：默认拦不住；打开上方的「抽屉守卫」后，锁定期间抽屉会被立即关闭（需 Android 12 及以上，且需授予无障碍权限）。\n原因：系统界面窗口层级高于应用悬浮窗，且全面屏手势由系统直接消费、不产生按键事件，应用层没有可用接口。详见项目 README。</string>
 
     <string name="settings_about_title">关于</string>
     <string name="settings_about_version">版本 %1$s</string>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  抽屉守卫（ShadeGuardService）的无障碍服务配置。
+
+  这个文件同时也是本功能的"权限声明"：无障碍能力面能压多小就压多小，
+  每一项能力都显式写出来（包括显式关闭的），便于审阅。
+
+  - packageNames 只留 com.android.systemui：本服务只能收到系统界面的窗口事件，
+    其它任何应用的窗口变化都收不到。代码里的过滤条件与此一致，两处都不放宽。
+  - accessibilityEventTypes 只留 typeWindowStateChanged：不订阅内容变化、滚动、
+    焦点变化等高频事件，既够用又减少常驻开销。
+  - canRetrieveWindowContent=false：读不到任何界面内容（拿不到节点树、文本、控件 id），
+    只剩事件自带的包名这一层元数据。
+  - 手势注入、触摸浏览、按键过滤全部显式关闭：本服务只调用 performGlobalAction 关抽屉，
+    不需要这些能力。
+
+  isAccessibilityTool=false 是如实声明（targetSdk 31+ 强制要求填）：本服务不是为残障用户
+  提供的辅助功能。Google Play 明确禁止这类用途，本项目只通过 GitHub Releases 侧载分发。
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canPerformGestures="false"
+    android:canRequestFilterKeyEvents="false"
+    android:canRequestTouchExplorationMode="false"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/guard_a11y_description"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="50"
+    android:packageNames="com.android.systemui" />
