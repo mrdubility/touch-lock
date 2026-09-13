@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  长按桌面图标出现的静态快捷方式（API 25+，minSdk 26 无需兼容分支）。
+  这是"点图标直接倒数锁定"之后进入设置页的主流入口；静态 shortcut 不需要任何权限。
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_settings"
+        android:shortcutId="open_settings"
+        android:shortcutLongLabel="@string/shortcut_settings_long"
+        android:shortcutShortLabel="@string/shortcut_settings_short">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.touchlock.SettingsActivity"
+            android:targetPackage="com.touchlock" />
+    </shortcut>
+
+</shortcuts>

@@ -3,9 +3,23 @@
     <color name="overlay_scrim">#00000000</color>
     <color name="hint_text">#FFFFFFFF</color>
 
-    <!-- 解锁按钮 -->
-    <color name="unlock_button">#FFFFFFFF</color>
-    <color name="unlock_button_text">#FF1A1A1A</color>
+    <!-- 滑动解锁条：最低背光下靠白色滑块 + 半透明轨道保证对比度 -->
+    <color name="slide_track">#33FFFFFF</color>
+    <color name="slide_track_stroke">#66FFFFFF</color>
+    <color name="slide_knob">#FFFFFFFF</color>
+    <color name="slide_knob_icon">#FF1A1A1A</color>
+    <color name="slide_text">#FFFFFFFF</color>
+
+    <!-- 倒计时顶部小卡片 -->
+    <color name="countdown_card_bg">#CC000000</color>
+    <color name="countdown_text_primary">#FFFFFFFF</color>
+    <color name="countdown_text_secondary">#B3FFFFFF</color>
+
+    <!-- 设置页 -->
+    <color name="settings_page_bg">#FFF2F3F5</color>
+    <color name="settings_card_bg">#FFFFFFFF</color>
+    <color name="settings_text_primary">#DE000000</color>
+    <color name="settings_text_secondary">#8A000000</color>
 
     <!-- 自适应启动图标背景 -->
     <color name="ic_launcher_background">#FF1E88E5</color>

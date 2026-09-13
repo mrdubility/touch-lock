@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置图标（滑块/tune 样式，单色剪影）。
+  单色设计的好处：桌面长按快捷方式直接用深色，倒计时卡片上的 ImageButton 用 android:tint
+  染成白色也不会丢细节。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 第一行：轨道 + 滑块（圆心 7,6） -->
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M2,5h2.4v2H2z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M9.6,5H22v2H9.6z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M4.4,6a2.6,2.6 0 1,0 5.2,0a2.6,2.6 0 1,0 -5.2,0z" />
+
+    <!-- 第二行：轨道 + 滑块（圆心 16,12） -->
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M2,11h11.4v2H2z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M18.6,11H22v2h-3.4z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M13.4,12a2.6,2.6 0 1,0 5.2,0a2.6,2.6 0 1,0 -5.2,0z" />
+
+    <!-- 第三行：轨道 + 滑块（圆心 10,18） -->
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M2,17h5.4v2H2z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M12.6,17H22v2h-9.4z" />
+    <path
+        android:fillColor="#FF3C3C43"
+        android:pathData="M7.4,18a2.6,2.6 0 1,0 5.2,0a2.6,2.6 0 1,0 -5.2,0z" />
+
+</vector>

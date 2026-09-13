@@ -1,24 +1,71 @@
 <resources>
     <string name="app_name">触摸锁</string>
 
-    <!-- 主界面 -->
-    <string name="main_title">触摸锁</string>
-    <string name="main_subtitle">锁定屏幕触摸，防止误触；底层应用保持前台</string>
-    <string name="lock_button">锁定屏幕</string>
-    <string name="permission_button">授予悬浮窗权限</string>
-    <string name="status_ready">已就绪：点击“锁定屏幕”后，可在 3 秒内切换到目标应用</string>
-    <string name="status_need_permission">需要先授予“显示在其他应用上层”权限</string>
-    <string name="countdown">%1$d 秒后锁定，请切换到目标应用…</string>
+    <!-- 桌面长按快捷方式 -->
+    <string name="shortcut_settings_short">设置</string>
+    <string name="shortcut_settings_long">打开触摸锁设置</string>
 
-    <!-- 覆盖层 -->
+    <!-- 未授权引导页 -->
+    <string name="main_title">触摸锁</string>
+    <string name="main_subtitle">点桌面图标即开始倒数锁定；锁定期间屏幕触摸全部被拦截，底层应用保持前台</string>
+    <string name="status_need_permission">尚未开启“显示在其他应用上层”权限，锁定浮层无法显示</string>
+    <string name="status_ready">悬浮窗权限已开启，返回桌面点图标即可开始倒数锁定</string>
+    <string name="guide_steps">开启步骤：\n1. 点下方“授予悬浮窗权限”\n2. 在系统页面打开“允许显示在其他应用上层”开关\n3. 返回本应用，状态变为已就绪后回桌面点图标</string>
+    <string name="permission_button">授予悬浮窗权限</string>
+    <string name="settings_button">设置</string>
+
+    <!-- 倒计时卡片（顶部小浮层） -->
+    <string name="countdown_card_hint">秒后锁定，现在可切换到目标应用</string>
+    <string name="countdown_cancel">取消</string>
+    <string name="countdown_settings">设置</string>
+
+    <!-- 锁定覆盖层 -->
     <string name="overlay_hint">触摸已锁定</string>
-    <string name="overlay_unlock">解锁</string>
-    <string name="overlay_doubletap_hint">双击此处解锁</string>
+    <string name="slide_to_unlock">滑动解锁</string>
+    <string name="overlay_slide_hint">按住滑块向右拖到底解锁</string>
 
     <!-- 通知 -->
     <string name="channel_name">触摸锁服务</string>
     <string name="channel_desc">触摸锁前台服务通知</string>
+    <string name="notify_countdown_title">即将锁定屏幕</string>
+    <string name="notify_countdown_text">%1$d 秒后锁定，点“取消”可放弃</string>
     <string name="notify_title">触摸锁已启用</string>
-    <string name="notify_text">双击屏幕中央按钮解锁</string>
+    <string name="notify_text">滑动屏幕中央的滑块解锁</string>
     <string name="notify_unlock">解锁</string>
+    <string name="notify_cancel">取消</string>
+
+    <!-- 设置页 -->
+    <string name="settings_title">设置</string>
+
+    <string name="settings_overlay_title">悬浮窗权限</string>
+    <string name="settings_overlay_on">已开启</string>
+    <string name="settings_overlay_off">未开启</string>
+    <string name="settings_overlay_go">去开启</string>
+    <!-- 厂商权限路径：故意拆成多条单行字符串，由 SettingsActivity 用 \n 拼接，避开 XML 裸换行被折叠成空格 -->
+    <string name="settings_overlay_paths_title">各品牌开启路径：</string>
+    <string name="settings_overlay_path_aosp">原生 Android：设置 &gt; 应用 &gt; 触摸锁 &gt; 显示在其他应用上层</string>
+    <string name="settings_overlay_path_miui">小米 / 红米：设置 &gt; 应用设置 &gt; 授权管理 &gt; 显示悬浮窗</string>
+    <string name="settings_overlay_path_emui">华为 / 荣耀：设置 &gt; 应用和服务 &gt; 权限管理 &gt; 悬浮窗</string>
+    <string name="settings_overlay_path_other">OPPO / vivo：设置 &gt; 权限与隐私 &gt; 悬浮窗</string>
+
+    <string name="settings_delay_title">锁定倒计时</string>
+    <string name="settings_delay_value">%1$d 秒后锁定</string>
+    <string name="settings_delay_zero">立即锁定</string>
+    <string name="settings_delay_hint">点桌面图标后等待的秒数，期间可切换到要保护的应用；0 表示立即锁定</string>
+    <string name="settings_delay_now">立即</string>
+    <string name="settings_delay_3">3 秒</string>
+    <string name="settings_delay_5">5 秒</string>
+    <string name="settings_delay_10">10 秒</string>
+
+    <string name="settings_notify_title">通知权限</string>
+    <string name="settings_notify_on">已授权</string>
+    <string name="settings_notify_off">未授权</string>
+    <string name="settings_notify_go">去授权</string>
+    <string name="settings_notify_hint">授权后通知栏常驻一条通知，提供“解锁”与倒计时“取消”按钮，作为滑动条之外的备用出口；未授权时前台服务照常运行，只是通知不展示</string>
+
+    <string name="settings_limit_title">能力边界</string>
+    <string name="settings_limit_body">可拦截：屏幕内的普通触摸、返回键。\n无法拦截：通知栏下拉、上滑回桌面、上滑任务中心、侧滑返回手势、音量键、电源键。\n原因：系统界面窗口层级高于应用悬浮窗，且全面屏手势由系统直接消费、不产生按键事件，应用层没有可用接口。详见项目 README。</string>
+
+    <string name="settings_about_title">关于</string>
+    <string name="settings_about_version">版本 %1$s</string>
 </resources>

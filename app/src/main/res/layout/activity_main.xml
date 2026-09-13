@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  未授权引导页：MainActivity 在已授予悬浮窗权限时会直接开始倒数并 finish，
+  因此本布局只在尚未授权时可见，职责是引导开启权限并提供设置入口。
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
+    android:gravity="center_horizontal"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingStart="24dp"
+    android:paddingTop="56dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="24dp">
 
     <TextView
         android:layout_width="wrap_content"
@@ -27,22 +34,32 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
         android:gravity="center"
-        android:text="@string/status_ready"
-        android:textSize="15sp" />
+        android:text="@string/status_need_permission"
+        android:textSize="15sp"
+        android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/lockButton"
+    <TextView
+        android:id="@+id/guideStepsText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/lock_button" />
+        android:layout_marginTop="16dp"
+        android:gravity="start"
+        android:lineSpacingExtra="4dp"
+        android:text="@string/guide_steps"
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/permissionButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="@string/permission_button"
-        android:visibility="gone" />
+        android:layout_marginTop="24dp"
+        android:text="@string/permission_button" />
+
+    <Button
+        android:id="@+id/settingsButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/settings_button" />
 
 </LinearLayout>

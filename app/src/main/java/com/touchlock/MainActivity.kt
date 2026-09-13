@@ -1,116 +1,72 @@
 package com.touchlock
 
-import android.Manifest
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.CountDownTimer
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
 
 /**
- * 主界面：
- * 1. 检查/引导"显示在其他应用上层"（悬浮窗）权限；
- * 2. Android 13+ 申请通知权限（前台服务通知需要）；
- * 3. 点击"锁定屏幕"后 3 秒倒计时，便于切换到目标应用，倒计时结束启动前台服务显示覆盖层。
+ * 入口 Activity（launcher），只做路由：
+ * - 已授权悬浮窗：直接启动前台服务开始倒数锁定，随后 finish。点图标即触发，
+ *   这是专注类应用的主流交互；设置入口改由长按图标快捷方式、倒计时卡片齿轮、
+ *   通知点击与未授权引导页四处提供。
+ * - 未授权：显示引导页，引导开启"显示在其他应用上层"，并可进入设置。
  */
 class MainActivity : Activity() {
 
-    private lateinit var statusText: TextView
-    private lateinit var lockButton: Button
-    private lateinit var permissionButton: Button
-
-    private var countDownTimer: CountDownTimer? = null
-    private var counting = false
+    private var statusText: TextView? = null
+    private var permissionButton: Button? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Settings.canDrawOverlays(this)) {
+            startLockCountdown()
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
-
         statusText = findViewById(R.id.statusText)
-        lockButton = findViewById(R.id.lockButton)
         permissionButton = findViewById(R.id.permissionButton)
-
-        permissionButton.setOnClickListener { openOverlayPermissionSettings() }
-        lockButton.setOnClickListener { startLockCountdown() }
-
-        requestNotificationPermissionIfNeeded()
+        permissionButton?.setOnClickListener { openOverlayPermissionSettings() }
+        findViewById<Button>(R.id.settingsButton).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        if (!counting) updateUiByPermission()
-    }
-
-    override fun onDestroy() {
-        countDownTimer?.cancel()
-        countDownTimer = null
-        super.onDestroy()
-    }
-
-    private fun updateUiByPermission() {
+        // 已授权路径在 onCreate 就 finish 了，走不到这里；此处只服务引导页
+        val status = statusText ?: return
         if (Settings.canDrawOverlays(this)) {
-            permissionButton.visibility = View.GONE
-            lockButton.isEnabled = true
-            statusText.text = getString(R.string.status_ready)
+            status.text = getString(R.string.status_ready)
+            permissionButton?.visibility = View.GONE
         } else {
-            permissionButton.visibility = View.VISIBLE
-            lockButton.isEnabled = false
-            statusText.text = getString(R.string.status_need_permission)
+            status.text = getString(R.string.status_need_permission)
+            permissionButton?.visibility = View.VISIBLE
         }
+    }
+
+    /** 把设置里的倒计时秒数交给前台服务，由服务执行"倒数卡片 -> 全屏锁定" */
+    private fun startLockCountdown() {
+        // Android 8+ 启动前台服务必须用 startForegroundService
+        startForegroundService(
+            Intent(this, TouchLockService::class.java)
+                .putExtra(TouchLockService.EXTRA_DELAY_SECONDS, Prefs.delaySeconds(this))
+        )
     }
 
     private fun openOverlayPermissionSettings() {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            Uri.parse("package:$packageName")
+        startActivity(
+            Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
         )
-        startActivity(intent)
-    }
-
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATION)
-        }
-    }
-
-    private fun startLockCountdown() {
-        if (!Settings.canDrawOverlays(this)) {
-            openOverlayPermissionSettings()
-            return
-        }
-        counting = true
-        lockButton.isEnabled = false
-        countDownTimer?.cancel()
-        countDownTimer = object : CountDownTimer(COUNTDOWN_MS, 1000L) {
-            override fun onTick(millisUntilFinished: Long) {
-                val seconds = ((millisUntilFinished + 999) / 1000).toInt()
-                statusText.text = getString(R.string.countdown, seconds)
-            }
-
-            override fun onFinish() {
-                counting = false
-                startLockService()
-                // 覆盖层已遮住本界面；重置为就绪态，解锁后返回时 UI 正确
-                updateUiByPermission()
-            }
-        }.start()
-    }
-
-    private fun startLockService() {
-        // Android 8+ 后台/前台启动前台服务都需用 startForegroundService
-        startForegroundService(Intent(this, TouchLockService::class.java))
-    }
-
-    companion object {
-        private const val COUNTDOWN_MS = 3000L
-        private const val REQ_NOTIFICATION = 100
     }
 }

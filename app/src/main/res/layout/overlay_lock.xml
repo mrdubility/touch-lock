@@ -2,7 +2,7 @@
 <!--
   覆盖层布局：
   - 根为 LockRootLayout，全屏、透明背景（靠窗口 screenBrightness 压暗），clickable 消费所有触摸；
-  - 屏幕正中央一个圆形解锁按钮，双击解锁（逻辑在 TouchLockService 中用 GestureDetector 处理）。
+  - 屏幕正中央一个滑动解锁条（SlideToUnlockView），拖到底才解锁，避开双击误触。
 -->
 <com.touchlock.LockRootLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -28,24 +28,16 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/unlockButton"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
-            android:background="@drawable/bg_unlock_button"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:text="@string/overlay_unlock"
-            android:textColor="@color/unlock_button_text"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+        <com.touchlock.SlideToUnlockView
+            android:id="@+id/slideToUnlock"
+            android:layout_width="300dp"
+            android:layout_height="64dp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="@string/overlay_doubletap_hint"
+            android:text="@string/overlay_slide_hint"
             android:textColor="@color/hint_text"
             android:textSize="14sp" />
 

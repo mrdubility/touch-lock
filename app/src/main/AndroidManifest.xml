@@ -9,6 +9,13 @@
     <!-- Android 13+ 显示前台服务通知需要 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      权限边界（保持最小，新增前请先评估必要性）：
+      以上 4 项即全部。本项目不申请：剪贴板读写、传感器/设备动作方向、
+      安装快捷方式（桌面长按快捷方式用 res/xml/shortcuts.xml 静态声明，无需权限）、
+      读取应用列表（QUERY_ALL_PACKAGES）、定位、相机、麦克风、通讯录等。
+    -->
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -25,7 +32,20 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- 长按桌面图标出现的静态快捷方式（进设置） -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!--
+          设置页：exported=true 是 launcher 启动静态 shortcut 的必要条件；
+          不配 intent-filter，因此外部无法通过隐式 Intent 唤起。
+        -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="@string/settings_title" />
 
         <service
             android:name=".TouchLockService"

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 倒计时顶部小卡片背景：半透明黑 + 圆角，保证在任意底层应用上都看得清 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/countdown_card_bg" />
+    <corners android:radius="16dp" />
+</shape>

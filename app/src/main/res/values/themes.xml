@@ -1,4 +1,32 @@
 <resources>
     <!-- 使用平台主题（无 AndroidX 依赖），配合 android.app.Activity -->
     <style name="Theme.TouchLock" parent="@android:style/Theme.Material.Light.NoActionBar" />
+
+    <!-- 设置页卡片：白底 + 轻微阴影，替代 AndroidX 的 CardView（保持零依赖） -->
+    <style name="SettingsCard">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">@color/settings_card_bg</item>
+        <item name="android:elevation">2dp</item>
+        <item name="android:padding">16dp</item>
+        <item name="android:layout_marginTop">12dp</item>
+    </style>
+
+    <style name="SettingsCardTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/settings_text_primary</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="SettingsCardBody">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:lineSpacingExtra">4dp</item>
+        <item name="android:textColor">@color/settings_text_secondary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
 </resources>
