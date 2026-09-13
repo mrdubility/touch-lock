@@ -59,6 +59,6 @@
 ## 给开发者
 
 - **构建**：JDK 17 + Android SDK 34（build-tools 34.0.0）。仓库未提交 `gradle-wrapper.jar`，本机用 `gradle assembleDebug` 或 Android Studio 直接构建。
-- **发版**：版本号只写在 `app/build.gradle.kts`（`versionCode` 递增以允许覆盖安装，`versionName` 是人读的版本号）；标签名决定 Release 标题与产物名 `touch-lock-<tag>-release.apk`。改完提交后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 只构建 debug 包验证可编译，不发布。
+- **发版**：版本号只写在 `app/build.gradle.kts`（`versionCode` 递增以允许覆盖安装，`versionName` 是人读的版本号）；标签名决定 Release 标题与产物名 `touch-lock-<tag>-release.apk`。改完提交后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 也会构建并正式签名 release 包，但只停在 Actions 产物里（保留 14 天，需登录下载），不创建 Release —— 用来先跑真机，而且它能直接覆盖安装在已发版本之上（debug 包签名不同，做不到这一点）。
 - **签名密钥**：`keystore/` 整个目录被 `.gitignore` 忽略，密钥库与密码只存在本机，CI 靠 GitHub Secrets（`KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`）还原。**务必自行备份 keystore 和密码**：一旦丢失，老用户无法覆盖升级，只能卸载重装。
 - **代码**：Kotlin，零 AndroidX 依赖（仅平台 API + Kotlin stdlib），源码在 `app/src/main/java/com/touchlock/`。锁定层是 `TYPE_APPLICATION_OVERLAY` 全宽覆盖层，触摸在 `dispatchTouchEvent` 层消费、返回键被吞；前台服务用 `specialUse` 类型以免被厂商 ROM 识别为锁屏类强杀。

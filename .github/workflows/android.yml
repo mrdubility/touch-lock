@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build-apk:
-    name: Assemble APK (tags 额外产出正式签名 release)
+    name: Assemble APK (main 与 tag 都产出正式签名 release，仅 tag 对外发布)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -86,11 +86,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # ================= 以下仅在 v* 标签推送时执行 =================
+      # ============ 以下步骤 main 推送与 v* 标签推送都执行 ============
+      # 条件：github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      # main 也跑一遍正式签名，是为了得到一个“能直接覆盖安装、但不会发布出去”的自测包：
+      # debug 包用的是默认 debug keystore，与 release 包签名不同，装之前必须先卸载、
+      # 还会丢掉已存设置；用同一把正式密钥签的包就没这个麻烦。
+      # 该条件对 pull_request 自动不成立（其 github.ref 是 refs/pull/N/merge），
+      # 所以来自 fork 的 PR（本就拿不到 Secrets）不会因为这些步骤而失败。
       # 签名密钥不入库：由 GitHub Secrets 提供，临时还原到 runner 上，用完随虚拟机一起销毁
 
       - name: Restore release keystore from secrets
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -110,14 +116,14 @@ jobs:
           echo "keystore 已还原：$(wc -c < "$RUNNER_TEMP/keystore/touch-lock-release.jks") bytes"
 
       - name: Assemble signed release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
           gradle --no-daemon assembleRelease --stacktrace --console=plain 2>&1 | tee /tmp/gradle-release.log
 
       # 硬验签：万一签名链路静默失效（产出未签名 APK），在此处直接失败而不是发到 Release 上
       - name: Verify release APK signature
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/release/app-release.apk
@@ -146,8 +152,9 @@ jobs:
           fi
           echo "证书指纹匹配，确认本次产物由正式 release key 签名"
 
+      # main 与 tag 共用同一个产物名：具体是哪个版本看运行页上的 ref 与提交即可
       - name: Upload release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
           name: touch-lock-release-apk
@@ -155,7 +162,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # 仅当本次运行由 v* 标签推送触发时，把正式签名 APK 发布成 GitHub Release
+      # 只有 tag 才对外发布：main 上得到的签名包只停在 Actions Artifacts（需登录才能下载）
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
