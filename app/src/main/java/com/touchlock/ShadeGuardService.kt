@@ -5,6 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 
@@ -34,6 +35,9 @@ import android.view.accessibility.AccessibilityManager
  */
 class ShadeGuardService : AccessibilityService() {
 
+    /** 上次动手的时间（uptimeMillis），用于 [ACTION_THROTTLE_MS] 节流 */
+    private var lastActionAt = 0L
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         // 热路径上的判断全部是本地读值，不查系统服务：这个回调在锁定期间可能很密集
@@ -46,10 +50,25 @@ class ShadeGuardService : AccessibilityService() {
         // 本服务不朗读、不震动，没有需要中断的反馈
     }
 
+    /**
+     * 关闭抽屉，分两步：
+     *
+     * 1. GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE —— 精确、无副作用，抽屉没开时是空操作。
+     * 2. GLOBAL_ACTION_BACK —— 兜底。部分机型的控制中心是与通知栏并列的独立窗口，
+     *    第 1 步关不掉它（实测表现：通知栏能关、控制中心关不掉），返回键可以。
+     *    误发也无害：锁定期间覆盖层窗口持有焦点，而 LockRootLayout.dispatchKeyEvent
+     *    会吞掉返回键，事件不会落到底层应用 —— 也就是说锁定期间返回键本来就是失效的。
+     *
+     * 节流的原因：音量条、截屏动画、横幅通知等 SystemUI 窗口也会触发本回调，
+     * 它们并不需要任何动作；抽屉被关掉的过程本身也会再发一次窗口事件。
+     */
     private fun dismissShade() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-        // 抽屉没开时是空操作；失败也不重试，下一个窗口事件还会再来一次
+        val now = SystemClock.uptimeMillis()
+        if (now - lastActionAt < ACTION_THROTTLE_MS) return
+        lastActionAt = now
         runCatching { performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE) }
+        runCatching { performGlobalAction(GLOBAL_ACTION_BACK) }
     }
 
     companion object {
@@ -58,6 +77,12 @@ class ShadeGuardService : AccessibilityService() {
         val SUPPORTED: Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
         private const val SYSTEMUI_PACKAGE = "com.android.systemui"
+
+        /**
+         * 两次动作的最小间隔。取 300ms：比抽屉展开动画短（不会漏掉紧接着拉出的控制中心），
+         * 又能把口袋里的连续摩擦、以及我们自己关掉抽屉引发的后续事件压成一次。
+         */
+        private const val ACTION_THROTTLE_MS = 300L
 
         /**
          * 功能是否真正生效：系统版本支持 + 用户在设置页打开 + 系统里启用了本服务。

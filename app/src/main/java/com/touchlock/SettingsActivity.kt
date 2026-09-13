@@ -160,16 +160,11 @@ class SettingsActivity : Activity() {
     }
 
     private fun setupGuardControls() {
-        findViewById<TextView>(R.id.guardDiffText).text = joinLines(
+        findViewById<TextView>(R.id.guardNoteText).text = joinLines(
             R.string.settings_guard_diff_off,
             R.string.settings_guard_diff_on,
-            R.string.settings_guard_diff_same
-        )
-        findViewById<TextView>(R.id.guardCostText).text = joinLines(
-            R.string.settings_guard_cost_warn,
-            R.string.settings_guard_cost_restricted,
-            R.string.settings_guard_cost_rom,
-            R.string.settings_guard_cost_battery
+            R.string.settings_guard_diff_same,
+            R.string.settings_guard_tip
         )
         guardSwitch.setOnCheckedChangeListener { _, checked ->
             Prefs.setShadeGuardEnabled(this, checked)

@@ -49,7 +49,7 @@
 
 不联网、不采集数据、没有广告。默认只申请 manifest 里的四项权限：悬浮窗、前台服务（含 targetSdk 34 要求的 `specialUse` 类型声明）、通知。调暗是靠自身窗口的参数，不改系统亮度设置，解锁后自动恢复。
 
-可选的「抽屉守卫」会多一个无障碍服务，由你在系统设置里亲手启用，不启用就完全不生效。它的能力在 `app/src/main/res/xml/shade_guard_service.xml` 里压到了最小：只监听系统界面（`com.android.systemui`）的窗口状态事件，`canRetrieveWindowContent=false`（读不到任何界面内容），不注入手势，且只在锁定期间动作。即便如此，无障碍仍是 Android 上最高的应用权限之一（系统会弹强警告），介意的人不要开。
+可选的「抽屉守卫」会多一个无障碍服务，由你在系统设置里亲手启用，不启用就完全不生效。它的能力在 `app/src/main/res/xml/shade_guard_service.xml` 里压到了最小：只监听系统界面（`com.android.systemui`）的窗口状态事件，`canRetrieveWindowContent=false`（读不到任何界面内容），不注入手势，且只在锁定期间动作。部分机型的控制中心是独立窗口，关抽屉的专用动作对它无效，此时会补发一次返回键 —— 锁定期间返回键本来就被覆盖层吞掉，所以对底层应用没影响。即便如此，无障碍仍是 Android 上最高的应用权限之一（系统会弹强警告），介意的人不要开。
 
 ## 版本
 

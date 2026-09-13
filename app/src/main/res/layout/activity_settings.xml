@@ -202,20 +202,9 @@
                 android:layout_marginTop="8dp"
                 android:text="@string/settings_guard_switch" />
 
+            <!-- 卡片正文：开与不开的差别、代价、受限设置的绕行路径，四行说清 -->
             <TextView
-                style="@style/SettingsCardBody"
-                android:text="@string/settings_guard_diff_title" />
-
-            <TextView
-                android:id="@+id/guardDiffText"
-                style="@style/SettingsCardBody" />
-
-            <TextView
-                style="@style/SettingsCardBody"
-                android:text="@string/settings_guard_cost_title" />
-
-            <TextView
-                android:id="@+id/guardCostText"
+                android:id="@+id/guardNoteText"
                 style="@style/SettingsCardBody" />
 
             <Button
@@ -250,6 +239,12 @@
             <TextView
                 android:id="@+id/aboutVersionText"
                 style="@style/SettingsCardBody" />
+
+            <!-- autoLink 让地址可直接点开，不用自己写跳转 -->
+            <TextView
+                style="@style/SettingsCardBody"
+                android:autoLink="web"
+                android:text="@string/settings_about_repo" />
 
         </LinearLayout>
 
