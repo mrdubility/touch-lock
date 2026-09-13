@@ -129,7 +129,22 @@ jobs:
             echo "找不到 apksigner，无法确认 APK 已签名" >&2
             exit 1
           fi
-          sh "$signer" verify --print-certs -v "$apk"
+          sh "$signer" verify --print-certs -v "$apk" | tee /tmp/apksigner-verify.txt
+          # 不只要“有签名”，还要是 RELEASE_CERT_SHA256.txt 登记的那把钥匙。
+          # 否则一旦密钥被换掉，老用户覆盖安装又会报签名冲突（和当初 debug keystore 同一个坑）。
+          want="$(tr -d ' \t\n\r:' < RELEASE_CERT_SHA256.txt | tr 'A-Z' 'a-z')"
+          got="$(grep 'certificate SHA-256 digest' /tmp/apksigner-verify.txt | head -1 | awk '{print $NF}')"
+          echo "expected cert sha256 = $want"
+          echo "actual   cert sha256 = $got"
+          if [ -z "$got" ]; then
+            echo "没能从 apksigner 输出里读到 SHA-256 指纹，请确认其输出格式" >&2
+            exit 1
+          fi
+          if [ "$want" != "$got" ]; then
+            echo "签名证书与登记指纹不一致：本次 APK 不是用正式 release key 签的，拒绝发布" >&2
+            exit 1
+          fi
+          echo "证书指纹匹配，确认本次产物由正式 release key 签名"
 
       - name: Upload release APK
         if: startsWith(github.ref, 'refs/tags/v')
@@ -154,9 +169,17 @@ jobs:
             echo "正式签名（自管 release key）的 release APK，可直接安装，后续版本覆盖升级无需卸载。"
             echo ""
             echo "- 点桌面图标 -> 顶部倒计时卡片（默认 5 秒，设置里可调 0–60 秒）-> 全屏锁定"
-            echo "- 解锁：按住屏幕中央滑块向右拖到底；通知栏“解锁”为备用出口"
+            echo "- 解锁：把屏幕四分之三高度处的滑块向右拖到底；点通知栏那条通知可直接解锁"
+            echo "- 倒计时阶段：点卡片齿轮进设置会先取消本次锁定；点通知即取消"
+            echo "- 暗屏下看不清滑块时，长按屏幕任意位置（含滑块上）临时点亮，松手恢复暗屏"
             echo "- 长按桌面图标可直接进入设置页"
             echo "- 若之前装过 debug 版：两者签名不同，需先卸载一次再装本包"
+            echo ""
+            echo "签名证书指纹（apksigner verify --print-certs，与仓库 RELEASE_CERT_SHA256.txt 一致）："
+            echo ""
+            echo '```'
+            grep -E 'certificate (DN|SHA-256 digest)' /tmp/apksigner-verify.txt || true
+            echo '```'
           } > notes.md
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag 已存在，覆盖上传产物"

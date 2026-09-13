@@ -27,6 +27,7 @@
 
 - Release 包用自管的正式签名密钥（`keystore/touch-lock-release.jks`，RSA 2048 / SHA256withRSA，有效期至 2056 年）签名，别名 `touch-lock`。**密钥库与密码不入库**（`.gitignore` 忽略 `/keystore/`），CI 从 GitHub Secrets 还原后临时签名，runner 销毁即消失。
 - 需要配置的 Secrets 只有两个：`KEYSTORE_BASE64`（密钥库的 base64）与 `KEYSTORE_PASSWORD`。缺失时 tag 构建会明确失败，不会静默发布未签名包（另有 apksigner 硬验签一步）。
+- 光“有签名”不够，还得是同一把钥匙：`RELEASE_CERT_SHA256.txt` 里登记了正式证书的 SHA-256 指纹，tag 构建时会把 `apksigner` 实际读到的指纹与之比对，不一致直接拒发。指纹是公开信息（Release 正文也会打印一份），可用来确认装到手机上的包与历史版本同源。
 - 从 debug 包换到 release 包、或从 v1.0/v1.1.0 的 debug 包升级，都会因签名不同而报"与已安装应用签名冲突"，**先卸载一次**再装 release 包即可；此后各版本之间可正常覆盖升级。
 - 历史版本的 debug 包签名互不相同，是因为每次 CI 构建都在全新 runner 上自动生成一份临时 `~/.android/debug.keystore`，这属于 debug 签名的固有行为，不是本项目的 bug。
 - **务必备份 `keystore/` 目录与密码**：丢失后无法用同一签名继续发版，老用户只能卸载重装。若将来上架 Google Play，可把这份密钥作为 upload key，或直接改用 Play App Signing 托管。
@@ -99,7 +100,7 @@ app/src/main/
 ## CI / 发版
 
 - push 到 `main`：GitHub Actions 自动构建 debug APK 并上传为构建产物（仅用于验证能编过，不作为发布物）。
-- push `v*` 标签：额外执行 `assembleRelease` 用正式密钥签名 → `apksigner verify` 校验 → 自动创建 GitHub Release 并附上 `touch-lock-<tag>-release.apk`。
+- push `v*` 标签：额外执行 `assembleRelease` 用正式密钥签名 → `apksigner verify` 校验签名与证书指纹（比对 `RELEASE_CERT_SHA256.txt`）→ 自动创建 GitHub Release 并附上 `touch-lock-<tag>-release.apk`。
 - 仓库未提交 `gradle-wrapper.jar`，CI 会从 `gradle/wrapper/gradle-wrapper.properties` 解析版本号后安装同版本 Gradle，再执行 `gradle assembleDebug/assembleRelease`。详见 `.github/workflows/android.yml`。
 
 本地构建 release 包：把 `keystore/touch-lock-release.jks` 与 `keystore/keystore.properties`（含 `storePassword`）放在仓库根目录的 `keystore/` 下即可被自动读取，无需设置环境变量。
