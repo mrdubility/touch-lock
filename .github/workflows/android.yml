@@ -3,12 +3,14 @@ name: Android Build
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
 
+# contents: write 仅用于 tag 触发时自动创建 Release；普通 push / PR 构建本身不需要写权限
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -81,3 +83,22 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      # 仅当本次运行由 v* 标签推送触发时，把 APK 发布成 GitHub Release
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          apk="touch-lock-${tag}-debug.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$apk"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag 已存在，覆盖上传产物"
+            gh release upload "$tag" "$apk" --clobber
+          else
+            gh release create "$tag" "$apk" \
+              --title "触摸锁 ${tag}" \
+              --notes "debug 签名，可直接安装。授予悬浮窗权限后点锁定屏幕，双击中央按钮解锁。"
+          fi
