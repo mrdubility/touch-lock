@@ -1,121 +1,62 @@
-# 触摸锁 (Touch Lock)
+# 触摸锁
 
-用悬浮窗覆盖层锁定屏幕触摸的极简 Android 应用：屏幕压到最低亮度、触摸全部被拦截、底层应用保持前台，屏幕四分之三处的滑动条拖到底解锁。
-
-适用场景：擦屏幕 / 贴膜 / 清洁手机、放口袋防误触、给小孩看视频防乱点、直播或展示时防触摸。
-
-## 功能
-
-- **点桌面图标或下拉栏磁贴即开始倒数锁定**：默认 5 秒，设置里可调 0–30 秒（0 = 立即锁定）。
-- **下拉栏快捷磁贴**：下拉两次通知栏 → 点右上角“编辑” → 把“触摸锁”拖进快捷开关区，点一下即开始倒数，不必先回桌面找图标；未授权悬浮窗时会自动跳到系统授权页。
-- **倒数期间不打断操作**：屏幕顶部只有一张小卡片（含"取消"与"设置"，点齿轮进设置会直接放弃本次锁定），其余区域触摸正常，可自由切换到要保护的应用。
-- **锁定态**：全屏覆盖层消费所有触摸，返回键被吞掉，窗口亮度压到最低；底层应用仍在前台运行。
-- **解锁**：滑动条位于屏幕垂直四分之三处（拇指更好够到），拖到底即解锁（iPhone 滑动关机样式）；**点通知栏那条通知也能直接解锁**（锁定通知不再另设重复的“解锁”按钮，整条通知就是入口）。
-- **暗屏下找不到滑块**：长按屏幕任意位置（包括滑块上）临时恢复亮度，松手重新变暗。
-- **设置页**：锁定倒计时、悬浮窗权限引导（含分厂商路径）、再次进入设置的路径、通知权限、能力边界说明、版本号。
-- **长按桌面图标**直接进设置（静态 App Shortcut）。
+锁住屏幕触摸，屏幕同时变到最暗，底层应用继续运行。适合擦屏幕、放口袋或包里防误触、把手机递给别人看视频时防乱点。
 
 ## 安装
 
-最低 Android 8.0（API 26）。
+需要 Android 8.0 及以上。从 [Releases](https://github.com/mrdubility/touch-lock/releases/latest) 下载最新的 `touch-lock-v*-release.apk` 安装。
 
-- 直接下载安装：https://github.com/mrdubility/touch-lock/releases/latest —— 页面里的 `touch-lock-v<版本>-release.apk` 即正式签名包。
-- 本地构建（需 Android Studio 或 JDK 17 + SDK 34）：`Build > Build App Bundle(s) / APK(s) > Build APK(s)`，产物在 `app/build/outputs/apk/debug/app-debug.apk`；`gradle assembleRelease` 在能读到签名材料时产出签名版 release APK。
+- 提示"与已安装应用签名不一致"：先卸载旧版本再装（只可能发生在从 1.1.0 或更早版本升级时）。
+- 不想要了：直接卸载即可，不会在系统里留下任何开关或配置。
 
-首次运行需授予"显示在其他应用上层"权限：点图标会出现引导页，设置页也提供一键跳转与各品牌路径。
+## 开始使用
 
-## 签名
+1. 打开应用，点「授予悬浮窗权限」→ 在系统页面里打开「允许显示在其他应用上层」→ 回到应用。这一步只需一次。
+2. 要锁的时候，任选一种：
+   - 点桌面的「触摸锁」图标
+   - 点下拉通知栏里的「触摸锁」磁贴（首次要添加：下拉两次通知栏 → 右上角「编辑」→ 把它拖进快捷开关区）
+3. 屏幕顶部出现倒计时（默认 5 秒，可调 0–30），这几秒内你切到哪个应用，之后就被锁在哪个应用上。
 
-- Release 包用自管的正式签名密钥（`keystore/touch-lock-release.jks`，RSA 2048 / SHA256withRSA，有效期至 2056 年）签名，别名 `touch-lock`。**密钥库与密码不入库**（`.gitignore` 忽略 `/keystore/`），CI 从 GitHub Secrets 还原后临时签名，runner 销毁即消失。
-- 需要配置的 Secrets 只有两个：`KEYSTORE_BASE64`（密钥库的 base64）与 `KEYSTORE_PASSWORD`。缺失时 tag 构建会明确失败，不会静默发布未签名包（另有 apksigner 硬验签一步）。
-- 光“有签名”不够，还得是同一把钥匙：`RELEASE_CERT_SHA256.txt` 里登记了正式证书的 SHA-256 指纹，tag 构建时会把 `apksigner` 实际读到的指纹与之比对，不一致直接拒发。指纹是公开信息（Release 正文也会打印一份），可用来确认装到手机上的包与历史版本同源。
-- 从 debug 包换到 release 包、或从 v1.0/v1.1.0 的 debug 包升级，都会因签名不同而报"与已安装应用签名冲突"，**先卸载一次**再装 release 包即可；此后各版本之间可正常覆盖升级。
-- 历史版本的 debug 包签名互不相同，是因为每次 CI 构建都在全新 runner 上自动生成一份临时 `~/.android/debug.keystore`，这属于 debug 签名的固有行为，不是本项目的 bug。
-- **务必备份 `keystore/` 目录与密码**：丢失后无法用同一签名继续发版，老用户只能卸载重装。若将来上架 Google Play，可把这份密钥作为 upload key，或直接改用 Play App Signing 托管。
+## 解锁与点亮
 
-## 权限清单（共 4 项，全部为功能必需）
+- **拖滑块**：滑块在屏幕下方约四分之三处，按住它一路拖到最右端。必须按在滑块上，单点、长按都不会误解锁。
+- **点通知**：下拉通知栏，点「触摸锁已启用」那条通知（通知上就写着点它可解锁）。
+- **看不清滑块**：屏幕锁定时是最低亮度。长按屏幕任意位置可临时点亮，看清后松手恢复暗屏；点亮期间可以直接继续拖动滑块。
+- **倒计时期间反悔**：点倒计时卡片上的「取消」，或点顶部通知里的「取消」。
 
-| 权限 | 用途 |
+## 改设置
+
+可以改倒计时秒数（0–30）、查看授权状态、跳到系统权限页。进入方式：
+
+- 长按桌面图标 →「设置」（推荐，任何时候都可用）
+- 点图标后，在顶部倒计时卡片上点齿轮 —— 这条路径会**顺带取消本次锁定**
+
+锁定期间下拉通知栏只能解锁，进不了设置页。
+
+## 能拦什么，拦不住什么
+
+| 拦得住 | 拦不住 |
 |---|---|
-| `SYSTEM_ALERT_WINDOW` | 显示全屏覆盖层以拦截触摸（核心） |
-| `FOREGROUND_SERVICE` | 锁定期间保持进程不被回收 |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | targetSdk 34 对前台服务类型的强制要求 |
-| `POST_NOTIFICATIONS` | Android 13+ 展示常驻通知，点它即可解锁（倒计时阶段为取消） |
+| 屏幕内的点击、滑动、长按 | 下拉通知栏 / 控制中心 |
+| 返回键 | 上滑回桌面、侧滑返回等全面屏手势 |
+| — | 音量键、电源键 |
 
-**明确未申请**：剪贴板读写、传感器 / 设备动作方向、安装桌面快捷方式（`INSTALL_SHORTCUT`）、读取应用列表（`QUERY_ALL_PACKAGES`）、定位、相机、麦克风、通讯录、存储读写、修改系统设置（`WRITE_SETTINGS`）、振动。
+拦不住的那些属于系统自己的手势和按键，优先级高于任何应用，第三方应用没有接口可以阻止。所以触摸锁适合防误触、防乱点，**不能当作防别人进系统、防窥的锁**。想要那种效果得用系统的「屏幕固定」或企业设备的 Kiosk 模式，本项目没走那条路 —— 那需要占一个前台 Activity，就没法让原来的应用继续显示在最上层了。
 
-说明：桌面长按快捷方式通过 `app/src/main/res/xml/shortcuts.xml` 静态声明实现，不需要任何权限；下拉栏快捷磁贴同理，`BIND_QUICK_SETTINGS_TILE` 是写在 `<service>` 上供系统绑定的权限，不属于应用申请的 `uses-permission`；亮度调低走窗口参数 `screenBrightness`，也不需要 `WRITE_SETTINGS`。
+## 隐私
 
-## 能力边界（重要）
+不联网、不采集数据、没有广告。一共只有四项权限：悬浮窗、前台服务（targetSdk 34 要求额外声明一种类型）、通知。调暗是靠自身窗口的参数，不改系统亮度设置，解锁后自动恢复。
 
-| 可以拦截 | 无法拦截 |
-|---|---|
-| 屏幕内的普通触摸（点击、滑动、长按） | 通知栏 / 控制中心下拉 |
-| 返回键（含手势返回中的按键事件部分） | 上滑回桌面、上滑悬停进任务中心 |
-| — | 侧滑返回等全面屏系统手势 |
-| — | 音量键、电源键、指纹 / 人脸解锁 |
+## 版本
 
-### 为什么拦不住通知栏与系统手势
+- **1.3**：新增下拉栏快捷磁贴；倒计时最长 30 秒；设置页说明如何再次进入。
+- **1.2**：改用正式签名（从这版起可覆盖升级）；滑块下移到四分之三处，手指行程更短；新增长按临时点亮。
+- **1.1**：双击屏幕解锁改为滑动解锁；新增设置页。
+- **1.0**：第一个版本。
 
-1. **窗口层级**：SystemUI 的 `StatusBar` / `NavigationBar` / `NotificationShade` 窗口类型高于 `TYPE_APPLICATION_OVERLAY`，下拉手势由 SystemUI 在系统层优先接管，应用层没有可用 API 阻止。
-2. **手势不是按键**：全面屏的上滑回桌面、上滑悬停、侧滑返回由系统 `InputDispatcher` 直接消费，不产生 `KeyEvent`。因此即便接入无障碍服务并用 `FLAG_REQUEST_FILTER_KEY_EVENTS` 过滤按键，也只能挡住三键导航与实体键，挡不住手势。
-3. **能做到系统级禁用的两条路**（本项目未实现）：
-   - **屏幕固定 / Lock Task**：`Activity.startLockTask()`，系统会禁用状态栏下拉、最近任务与通知展开。代价：必须有前台 Activity，会覆盖当前应用（与"底层应用保持前台"的核心目标冲突）；首次需用户确认；部分 ROM 需先在系统设置中启用"屏幕固定"。
-   - **Device Owner（Kiosk 模式）**：`adb shell dpm set-device-owner com.touchlock/.AdminReceiver` 一次性配置后，可无提示进入 Lock Task 并彻底禁用状态栏与导航栏。代价：需电脑 adb 操作、设备不能有其他账户、退出流程繁琐。
+## 给开发者
 
-本项目为兼顾"保持底层应用前台 + 权限最小化"，选择纯悬浮窗方案，并把边界如实写清。
-
-## 技术要点
-
-- **覆盖层**：`TYPE_APPLICATION_OVERLAY` + `FLAG_LAYOUT_IN_SCREEN | FLAG_LAYOUT_NO_LIMITS | FLAG_KEEP_SCREEN_ON`，不加 `FLAG_NOT_TOUCHABLE`，触摸被覆盖层消费而不下传。
-- **亮度**：窗口参数 `screenBrightness = 0.0f`（个别 ROM 可改 `0.01f`），窗口移除后自动恢复原亮度。
-- **长按临时点亮**：`LockRootLayout.dispatchTouchEvent` 旁听手势（不拦截，事件照常下发给滑块），`GestureDetector.onLongPress` 触发时把 `screenBrightness` 改为 `-1.0f`（跟随系统亮度）并 `updateViewLayout`，`ACTION_UP/CANCEL` 改回 `0.0f`。因为只是旁听，拖动滑块超过 touchSlop 时不会触发长按，解锁手势不受干扰。
-- **解锁条位置**：`overlay_lock.xml` 用上下两个 `Space`（`layout_weight` 3:1）把解锁条压在垂直约 75% 处，自适应各种屏幕比例。
-- **通知交互**：`contentIntent` 直接绑定解锁（锁定阶段）/ 取消（倒计时阶段），与 action 按钮共用同一 `PendingIntent`；设置页入口只保留长按图标快捷方式与未授权引导页，避开“锁定态下绕过锁”的可能。
-- **返回键**：自定义 `LockRootLayout.dispatchKeyEvent` 吞掉 `KEYCODE_BACK`。
-- **倒计时卡片**：`MATCH_PARENT x WRAP_CONTENT` + `FLAG_NOT_FOCUSABLE`，只覆盖顶部一小块，其余屏幕触摸自然穿透给底层应用。
-- **滑动解锁**：`SlideToUnlockView` 纯代码绘制轨道 / 滑块 / 箭头；必须按在滑块上（含 12dp 容差）并拖过 92% 行程才解锁，松手未到位自动回弹 —— 单点、长按、慢速拖动都不会误解锁。
-- **前台服务**：`foregroundServiceType="specialUse"` + `PROPERTY_SPECIAL_USE_FGS_SUBTYPE`；`START_NOT_STICKY`，避免被系统回收后以空 Intent 意外重锁。
-- **零 AndroidX 依赖**：`android.app.Activity` + 平台 `Theme.Material.Light.NoActionBar`，仅依赖 Kotlin stdlib，最大化构建成功率。
-
-## 目录结构
-
-```
-app/src/main/
-├─ AndroidManifest.xml
-├─ java/com/touchlock/
-│  ├─ MainActivity.kt          # 入口路由：已授权直接倒数，未授权显示引导页
-│  ├─ SettingsActivity.kt      # 设置页
-│  ├─ TouchLockService.kt      # 前台服务：倒计时卡片 + 全屏锁定覆盖层
-│  ├─ SlideToUnlockView.kt     # 滑动解锁条
-│  ├─ Prefs.kt                 # 倒计时秒数持久化
-│  └─ (LockRootLayout 定义在 TouchLockService.kt 顶部)
-└─ res/
-   ├─ layout/  activity_main, activity_settings, overlay_countdown, overlay_lock
-   ├─ values/  strings, colors, themes
-   ├─ drawable/ bg_countdown_card, ic_settings, ic_notification, ic_launcher_foreground
-   ├─ xml/      shortcuts
-   └─ mipmap-anydpi-v26/  ic_launcher, ic_launcher_round
-```
-
-## CI / 发版
-
-- push 到 `main`：GitHub Actions 自动构建 debug APK 并上传为构建产物（仅用于验证能编过，不作为发布物）。
-- push `v*` 标签：额外执行 `assembleRelease` 用正式密钥签名 → `apksigner verify` 校验签名与证书指纹（比对 `RELEASE_CERT_SHA256.txt`）→ 自动创建 GitHub Release 并附上 `touch-lock-<tag>-release.apk`。
-- 仓库未提交 `gradle-wrapper.jar`，CI 会从 `gradle/wrapper/gradle-wrapper.properties` 解析版本号后安装同版本 Gradle，再执行 `gradle assembleDebug/assembleRelease`。详见 `.github/workflows/android.yml`。
-
-本地构建 release 包：把 `keystore/touch-lock-release.jks` 与 `keystore/keystore.properties`（含 `storePassword`）放在仓库根目录的 `keystore/` 下即可被自动读取，无需设置环境变量。
-
-发版：
-
-```bash
-git tag v1.3.0
-git push origin v1.3.0
-```
-
-## 版本历史
-
-- **1.3**（versionCode 4）：新增下拉栏快捷磁贴（点一下即开始倒数锁定）；倒计时上限由 60 秒收窄到 30 秒，快捷按钮改为立即 / 1 / 5 / 10 秒；锁定通知去掉与“点通知即解锁”重复的“解锁”按钮；设置页新增“如何再回到设置页”引导卡片；已锁定时无视重复的锁定请求，避免锁屏上再叠一层倒计时卡片。
-- **1.2**（versionCode 3）：改用正式签名密钥发布 release APK（历史 debug 包每次 CI 都换签名，导致覆盖安装报签名冲突）；倒计时卡片点“设置”即取消本次锁定；通知点击由跳设置改为直接解锁/取消；解锁条从屏幕正中移到垂直四分之三处；新增长按屏幕任意位置临时点亮。
-- **1.1**（versionCode 2）：解锁方式由双击改为滑动条（防误触）；新增设置页与可调倒计时；点图标直接倒数锁定；新增长按图标进设置的快捷方式；倒计时改为顶部小卡片，期间可自由切换应用。
-- **1.0**：首个版本，悬浮窗锁定 + 最低亮度 + 双击解锁。
+- **构建**：JDK 17 + Android SDK 34（build-tools 34.0.0）。仓库未提交 `gradle-wrapper.jar`，本机用 `gradle assembleDebug` 或 Android Studio 直接构建。
+- **发版**：版本号同时写在 `app/build.gradle.kts`（`versionCode` / `versionName`）和 `.github/workflows/android.yml` 的 `EXPECTED_VERSION_NAME`（两处不一致会构建失败），然后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 只构建 debug 包验证可编译，不发布。
+- **签名密钥**：`keystore/` 整个目录被 `.gitignore` 忽略，密钥库与密码只存在本机，CI 靠 GitHub Secrets（`KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`）还原。**务必自行备份 keystore 和密码**：一旦丢失，老用户无法覆盖升级，只能卸载重装。
+- **代码**：Kotlin，零 AndroidX 依赖（仅平台 API + Kotlin stdlib），源码在 `app/src/main/java/com/touchlock/`。锁定层是 `TYPE_APPLICATION_OVERLAY` 全宽覆盖层，触摸在 `dispatchTouchEvent` 层消费、返回键被吞；前台服务用 `specialUse` 类型以免被厂商 ROM 识别为锁屏类强杀。
