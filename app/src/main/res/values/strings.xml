@@ -26,7 +26,7 @@
     <string name="overlay_hint">触摸已锁定</string>
     <string name="slide_to_unlock">滑动解锁</string>
     <string name="overlay_slide_hint">按住滑块向右拖到底解锁</string>
-    <string name="overlay_peek_hint">看不清滑块？长按屏幕任意位置可临时点亮</string>
+    <string name="overlay_peek_hint">看不清滑块？按住屏幕任意位置即临时点亮</string>
     <string name="overlay_peek_active">已临时点亮，松开手指恢复暗屏</string>
 
     <!-- 通知 -->

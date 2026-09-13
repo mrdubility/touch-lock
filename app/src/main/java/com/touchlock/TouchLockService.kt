@@ -31,11 +31,11 @@ import kotlin.math.abs
  * 覆盖层根布局，承担三件事：
  * 1. 吞掉返回键，防止锁定期间被 BACK 误退出（需窗口可聚焦，不加 FLAG_NOT_FOCUSABLE）；
  * 2. clickable 消费所有触摸，使事件不下传到底层应用；
- * 3. 在 dispatchTouchEvent 里“旁听”手势：长按屏幕任意位置（含滑块上）临时恢复亮度，
- *    松手压回最暗 —— 解决最低背光下看不清滑块的问题。
- *    旁听而非拦截：事件照常交给子 View，滑动解锁不受影响；移动超过 touchSlop 即取消
- *    长按计时，因此拖动滑块不会误亮屏。手写计时而不用 GestureDetector，是因为
- *    SimpleOnGestureListener 同时实现 OnGestureListener 与 OnDoubleTapListener，
+ * 3. 在 dispatchTouchEvent 里“旁听”手势：按住屏幕任意位置（含滑块上）临时点亮，
+ *    松手压回最暗 —— 解决最低背光下看不清滑块的问题。按住满 [PEEK_TRIGGER_DELAY_MS]
+ *    即点亮，一旦开始拖动更是当场点亮（拖滑块时最需要看清位置）。
+ *    旁听而非拦截：事件照常交给子 View，滑动解锁不受影响。手写计时而不用 GestureDetector，
+ *    是因为 SimpleOnGestureListener 同时实现 OnGestureListener 与 OnDoubleTapListener，
  *    在 Kotlin 里会造成 GestureDetector 构造函数的重载歧义。
  */
 class LockRootLayout @JvmOverloads constructor(
@@ -44,10 +44,9 @@ class LockRootLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    /** 亮度临时恢复回调：true = 长按中（恢复亮度），false = 松手（压回最暗） */
+    /** 亮度临时恢复回调：true = 按住中（点亮），false = 松手（压回最暗） */
     var onBrightnessPeek: ((Boolean) -> Unit)? = null
 
-    private val longPressTimeout = ViewConfiguration.getLongPressTimeout().toLong()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private var peeking = false
     private var downX = 0f
@@ -66,16 +65,18 @@ class LockRootLayout @JvmOverloads constructor(
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
-                postDelayed(peekRunnable, longPressTimeout)
+                postDelayed(peekRunnable, PEEK_TRIGGER_DELAY_MS)
             }
 
             MotionEvent.ACTION_MOVE -> {
                 if (abs(event.x - downX) > touchSlop || abs(event.y - downY) > touchSlop) {
-                    cancelPeekTimer()
+                    // 一开始拖动就点亮：拖滑块时正是最需要看清位置的时候，
+                    // 不该再等按住满多少毫秒（startPeek 幂等，已亮则重复调用无影响）
+                    startPeek()
                 }
             }
 
-            // 多指按下时不点亮，避免与系统多指手势语义冲突
+            // 多指按下时取消尚未触发的点亮计时（点亮本身无副作用，松手即灭）
             MotionEvent.ACTION_POINTER_DOWN -> cancelPeekTimer()
 
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
@@ -107,6 +108,15 @@ class LockRootLayout @JvmOverloads constructor(
         peeking = false
         onBrightnessPeek?.invoke(false)
     }
+
+    private companion object {
+        /**
+         * 按住多久开始点亮。系统默认的长按阈值是 500ms，再叠加 SurfaceFlinger
+         * 对背光变化的固定渐变，观感接近按了一秒才亮；压到 200ms 就是“按下即有反应”。
+         * 想改成接触瞬间点亮则填 0。
+         */
+        const val PEEK_TRIGGER_DELAY_MS = 200L
+    }
 }
 
 /**
@@ -116,7 +126,7 @@ class LockRootLayout @JvmOverloads constructor(
  *    因此用户可以照常切换到要保护的应用；卡片上提供取消按钮与设置入口（进设置即放弃本次锁定）。
  * 2. 锁定阶段：全屏 TYPE_APPLICATION_OVERLAY 覆盖层，消费所有触摸、吞掉返回键，
  *    窗口 screenBrightness=0.0f 把背光压到最低；滑动解锁条放在屏幕垂直四分之三处（拇指更好够到），
- *    长按屏幕任意位置可临时恢复亮度以便看清滑块，松手重新变暗。
+ *    按住屏幕任意位置（或一开始拖动滑块）即临时点亮以便看清滑块，松手重新变暗。
  *
  * 解锁、取消、点通知都会 stopSelf，onDestroy 负责移除全部浮层，亮度随窗口移除自动恢复。
  * 触发锁定的入口有两个：桌面图标（[MainActivity]）与下拉栏快捷磁贴（[LockTileService]），
@@ -135,11 +145,14 @@ class TouchLockService : Service() {
         private const val DIM_BRIGHTNESS = 0.0f
 
         /**
-         * 长按点亮时的亮度：-1.0f = 跟随系统默认亮度。
-         * 对应 AOSP 的 SCREEN_BRIGHTNESS_DEFAULT，但该常量是 @hide 的，
-         * 公开 SDK 只有 SCREEN_BRIGHTNESS_OVERRIDE_OFF / _FULL，因此只能自己写数值。
+         * 按住点亮时的亮度：显式给到最亮。
+         *
+         * 不用 -1.0f（AOSP 的 SCREEN_BRIGHTNESS_DEFAULT，它是 @hide，公开 SDK 只有
+         * OVERRIDE_OFF / OVERRIDE_FULL）：-1.0f 的含义是“交回系统当前亮度”，
+         * 而自动亮度在暗环境里本身就压得很低、还会以秒为单位缓慢爬升，
+         * 结果就是“按了半天亮得又慢又暗”。显式 1.0f 锁定的是本窗口的背光，不依赖系统状态。
          */
-        private const val FOLLOW_SYSTEM_BRIGHTNESS = -1.0f
+        private const val PEEK_BRIGHTNESS = 1.0f
     }
 
     private lateinit var windowManager: WindowManager
@@ -272,10 +285,10 @@ class TouchLockService : Service() {
         // 滑动解锁条：拖到底才解锁，替代原先易误触的双击
         view.findViewById<SlideToUnlockView>(R.id.slideToUnlock).onUnlocked = { stopSelf() }
 
-        // 长按屏幕任意位置（含滑块上）临时恢复亮度，便于看清滑块位置；松手压回最暗
+        // 按住屏幕任意位置（含滑块上）临时点亮，便于看清滑块位置；松手压回最暗
         val peekHint = view.findViewById<TextView>(R.id.peekHintText)
         view.onBrightnessPeek = { peek ->
-            applyScreenBrightness(if (peek) FOLLOW_SYSTEM_BRIGHTNESS else DIM_BRIGHTNESS)
+            applyScreenBrightness(if (peek) PEEK_BRIGHTNESS else DIM_BRIGHTNESS)
             peekHint.setText(
                 if (peek) R.string.overlay_peek_active else R.string.overlay_peek_hint
             )
@@ -300,7 +313,7 @@ class TouchLockService : Service() {
         view.requestFocus()
     }
 
-    /** 切换锁定窗口亮度：-1.0f = 跟随系统亮度，0.0f = 压到最暗 */
+    /** 切换锁定窗口亮度：[PEEK_BRIGHTNESS] = 点亮，[DIM_BRIGHTNESS] = 压到最暗 */
     private fun applyScreenBrightness(value: Float) {
         val view = lockView ?: return
         val lp = view.layoutParams as? WindowManager.LayoutParams ?: return
