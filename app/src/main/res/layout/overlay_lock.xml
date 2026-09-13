@@ -2,7 +2,8 @@
 <!--
   覆盖层布局：
   - 根为 LockRootLayout，全屏、透明背景（靠窗口 screenBrightness 压暗），clickable 消费所有触摸；
-  - 屏幕正中央一个滑动解锁条（SlideToUnlockView），拖到底才解锁，避开双击误触。
+  - 解锁条放在屏幕垂直四分之三处（上下 Space 按 3:1 分配剩余空间），比正中央更贴合单手拇指活动范围；
+  - 长按屏幕任意位置（含滑块上）由 LockRootLayout 旁听手势，临时恢复亮度，松手压回最暗。
 -->
 <com.touchlock.LockRootLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -12,17 +13,24 @@
     android:focusable="true">
 
     <LinearLayout
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_horizontal"
         android:orientation="vertical">
+
+        <!-- 上方 3 份、下方 1 份：解锁条落在垂直约 75% 高度处 -->
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="3" />
 
         <TextView
             android:id="@+id/lockHint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
             android:text="@string/overlay_hint"
             android:textColor="@color/hint_text"
             android:textSize="18sp"
@@ -37,9 +45,27 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
             android:text="@string/overlay_slide_hint"
             android:textColor="@color/hint_text"
             android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/peekHintText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:text="@string/overlay_peek_hint"
+            android:textColor="@color/hint_text"
+            android:textSize="13sp" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
 
     </LinearLayout>
 

@@ -23,14 +23,16 @@
     <string name="overlay_hint">触摸已锁定</string>
     <string name="slide_to_unlock">滑动解锁</string>
     <string name="overlay_slide_hint">按住滑块向右拖到底解锁</string>
+    <string name="overlay_peek_hint">看不清滑块？长按屏幕任意位置可临时点亮</string>
+    <string name="overlay_peek_active">已临时点亮，松开手指恢复暗屏</string>
 
     <!-- 通知 -->
     <string name="channel_name">触摸锁服务</string>
     <string name="channel_desc">触摸锁前台服务通知</string>
     <string name="notify_countdown_title">即将锁定屏幕</string>
-    <string name="notify_countdown_text">%1$d 秒后锁定，点“取消”可放弃</string>
+    <string name="notify_countdown_text">%1$d 秒后锁定，点通知即可取消</string>
     <string name="notify_title">触摸锁已启用</string>
-    <string name="notify_text">滑动屏幕中央的滑块解锁</string>
+    <string name="notify_text">点通知直接解锁，或拖动屏幕上的滑块</string>
     <string name="notify_unlock">解锁</string>
     <string name="notify_cancel">取消</string>
 
@@ -61,7 +63,7 @@
     <string name="settings_notify_on">已授权</string>
     <string name="settings_notify_off">未授权</string>
     <string name="settings_notify_go">去授权</string>
-    <string name="settings_notify_hint">授权后通知栏常驻一条通知，提供“解锁”与倒计时“取消”按钮，作为滑动条之外的备用出口；未授权时前台服务照常运行，只是通知不展示</string>
+    <string name="settings_notify_hint">授权后通知栏常驻一条通知，点它就能直接解锁（倒计时阶段为取消），作为滑动条之外的备用出口；未授权时前台服务照常运行，只是通知不展示</string>
 
     <string name="settings_limit_title">能力边界</string>
     <string name="settings_limit_body">可拦截：屏幕内的普通触摸、返回键。\n无法拦截：通知栏下拉、上滑回桌面、上滑任务中心、侧滑返回手势、音量键、电源键。\n原因：系统界面窗口层级高于应用悬浮窗，且全面屏手势由系统直接消费、不产生按键事件，应用层没有可用接口。详见项目 README。</string>

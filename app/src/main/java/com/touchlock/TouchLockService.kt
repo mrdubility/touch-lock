@@ -14,9 +14,11 @@ import android.os.Build
 import android.os.CountDownTimer
 import android.os.IBinder
 import android.util.AttributeSet
+import android.view.GestureDetector
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -25,19 +27,59 @@ import android.widget.ImageButton
 import android.widget.TextView
 
 /**
- * 覆盖层根布局：吞掉返回键，防止锁定期间被 BACK 误退出。
- * 需窗口可聚焦（不加 FLAG_NOT_FOCUSABLE）才能收到按键事件。
+ * 覆盖层根布局，承担三件事：
+ * 1. 吞掉返回键，防止锁定期间被 BACK 误退出（需窗口可聚焦，不加 FLAG_NOT_FOCUSABLE）；
+ * 2. clickable 消费所有触摸，使事件不下传到底层应用；
+ * 3. 在 dispatchTouchEvent 里“旁听”手势：长按屏幕任意位置（含滑块上）临时恢复亮度，
+ *    松手压回最暗 —— 解决最低背光下看不清滑块的问题。
+ *    旁听而非拦截：事件照常交给子 View，滑动解锁不受影响；移动超过 touchSlop 时
+ *    GestureDetector 不会触发长按，因此拖动滑块不会误亮屏。
  */
 class LockRootLayout @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
+
+    /** 亮度临时恢复回调：true = 长按中（恢复亮度），false = 松手（压回最暗） */
+    var onBrightnessPeek: ((Boolean) -> Unit)? = null
+
+    private var peeking = false
+
+    private val longPressDetector = GestureDetector(
+        context,
+        object : GestureDetector.SimpleOnGestureListener() {
+            override fun onLongPress(e: MotionEvent) {
+                startPeek()
+            }
+        }
+    )
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             return true // 消费返回键
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        longPressDetector.onTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> stopPeek()
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun startPeek() {
+        if (peeking) return
+        peeking = true
+        onBrightnessPeek?.invoke(true)
+    }
+
+    private fun stopPeek() {
+        if (!peeking) return
+        peeking = false
+        onBrightnessPeek?.invoke(false)
     }
 }
 
@@ -45,11 +87,12 @@ class LockRootLayout @JvmOverloads constructor(
  * 触摸锁前台服务，分两个阶段：
  *
  * 1. 倒计时阶段：屏幕顶部一张小卡片浮层。窗口只有卡片那么高，卡片以外的触摸会落到底层应用，
- *    因此用户可以照常切换到要保护的应用；卡片上提供取消按钮与进入设置的入口。
+ *    因此用户可以照常切换到要保护的应用；卡片上提供取消按钮与设置入口（进设置即放弃本次锁定）。
  * 2. 锁定阶段：全屏 TYPE_APPLICATION_OVERLAY 覆盖层，消费所有触摸、吞掉返回键，
- *    窗口 screenBrightness=0.0f 把背光压到最低；屏幕正中央是滑动解锁条，拖到底才解锁。
+ *    窗口 screenBrightness=0.0f 把背光压到最低；滑动解锁条放在屏幕垂直四分之三处（拇指更好够到），
+ *    长按屏幕任意位置可临时恢复亮度以便看清滑块，松手重新变暗。
  *
- * 解锁与取消都会 stopSelf，onDestroy 负责移除全部浮层，亮度随窗口移除自动恢复。
+ * 解锁、取消、点通知都会 stopSelf，onDestroy 负责移除全部浮层，亮度随窗口移除自动恢复。
  */
 class TouchLockService : Service() {
 
@@ -59,6 +102,9 @@ class TouchLockService : Service() {
         const val EXTRA_DELAY_SECONDS = "com.touchlock.extra.DELAY_SECONDS"
         private const val CHANNEL_ID = "touch_lock_channel"
         private const val NOTIFICATION_ID = 1001
+
+        /** 锁定态亮度：0.0 = 最暗（个别 ROM 不生效可改 0.01f） */
+        private const val DIM_BRIGHTNESS = 0.0f
     }
 
     private lateinit var windowManager: WindowManager
@@ -116,6 +162,8 @@ class TouchLockService : Service() {
         secondsText.text = seconds.toString()
         view.findViewById<Button>(R.id.cancelButton).setOnClickListener { stopSelf() }
         view.findViewById<ImageButton>(R.id.settingsButton).setOnClickListener {
+            // 进设置就是放弃本次锁定：倒计时若继续跑，用户改完参数回来就被锁住，属于意外行为
+            stopSelf()
             startActivity(
                 Intent(this, SettingsActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -178,11 +226,26 @@ class TouchLockService : Service() {
 
     private fun showLock() {
         val inflater = getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
-        val view = inflater.inflate(R.layout.overlay_lock, null)
+        val view = inflater.inflate(R.layout.overlay_lock, null) as LockRootLayout
         view.isFocusableInTouchMode = true
 
-        // 中央滑动解锁条：拖到底才解锁，替代原先易误触的双击
+        // 滑动解锁条：拖到底才解锁，替代原先易误触的双击
         view.findViewById<SlideToUnlockView>(R.id.slideToUnlock).onUnlocked = { stopSelf() }
+
+        // 长按屏幕任意位置（含滑块上）临时恢复亮度，便于看清滑块位置；松手压回最暗
+        val peekHint = view.findViewById<TextView>(R.id.peekHintText)
+        view.onBrightnessPeek = { peek ->
+            applyScreenBrightness(
+                if (peek) {
+                    WindowManager.LayoutParams.SCREEN_BRIGHTNESS_DEFAULT
+                } else {
+                    DIM_BRIGHTNESS
+                }
+            )
+            peekHint.setText(
+                if (peek) R.string.overlay_peek_active else R.string.overlay_peek_hint
+            )
+        }
 
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -195,13 +258,21 @@ class TouchLockService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            // 亮度压到最低（0.0 = 最暗）。个别 ROM 若不生效可改为 0.01f。
-            screenBrightness = 0.0f
+            screenBrightness = DIM_BRIGHTNESS
         }
 
         windowManager.addView(view, params)
         lockView = view
         view.requestFocus()
+    }
+
+    /** 切换锁定窗口亮度：-1.0f = 跟随系统亮度，0.0f = 压到最暗 */
+    private fun applyScreenBrightness(value: Float) {
+        val view = lockView ?: return
+        val lp = view.layoutParams as? WindowManager.LayoutParams ?: return
+        if (lp.screenBrightness == value) return
+        lp.screenBrightness = value
+        runCatching { windowManager.updateViewLayout(view, lp) }
     }
 
     private fun removeLock() {
@@ -236,36 +307,34 @@ class TouchLockService : Service() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
-    /** 倒计时阶段的通知：提供取消入口 */
-    private fun buildCountdownNotification(seconds: Int): Notification =
-        baseNotificationBuilder()
+    /** 倒计时阶段的通知：点通知本体与“取消”按钮等价，都是放弃本次锁定 */
+    private fun buildCountdownNotification(seconds: Int): Notification {
+        val cancelIntent = servicePendingIntent(ACTION_CANCEL_COUNTDOWN, 0)
+        return baseNotificationBuilder(cancelIntent)
             .setContentTitle(getString(R.string.notify_countdown_title))
             .setContentText(getString(R.string.notify_countdown_text, seconds))
-            .addAction(
-                buildAction(
-                    R.string.notify_cancel,
-                    servicePendingIntent(ACTION_CANCEL_COUNTDOWN, 0)
-                )
-            )
+            .addAction(buildAction(R.string.notify_cancel, cancelIntent))
             .build()
+    }
 
-    /** 锁定阶段的通知：滑动条之外的备用解锁出口 */
-    private fun buildLockNotification(): Notification =
-        baseNotificationBuilder()
+    /** 锁定阶段的通知：点通知本体即解锁，是滑动条之外的备用出口 */
+    private fun buildLockNotification(): Notification {
+        val unlockIntent = servicePendingIntent(ACTION_UNLOCK, 1)
+        return baseNotificationBuilder(unlockIntent)
             .setContentTitle(getString(R.string.notify_title))
             .setContentText(getString(R.string.notify_text))
-            .addAction(
-                buildAction(
-                    R.string.notify_unlock,
-                    servicePendingIntent(ACTION_UNLOCK, 1)
-                )
-            )
+            .addAction(buildAction(R.string.notify_unlock, unlockIntent))
             .build()
+    }
 
-    private fun baseNotificationBuilder(): Notification.Builder =
+    /**
+     * contentIntent 直接绑定解锁/取消：点图标已是“直接开始锁定”，
+     * 通知点击再跳设置既不符合直觉，也白白多一层操作。
+     */
+    private fun baseNotificationBuilder(contentIntent: PendingIntent): Notification.Builder =
         Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentIntent(settingsPendingIntent())
+            .setContentIntent(contentIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_SERVICE)
@@ -282,16 +351,6 @@ class TouchLockService : Service() {
             this,
             requestCode,
             Intent(this, TouchLockService::class.java).setAction(action),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-    /** 点通知进设置页：点图标已是直接锁定，通知点击再触发锁定会造成误锁 */
-    private fun settingsPendingIntent(): PendingIntent =
-        PendingIntent.getActivity(
-            this,
-            2,
-            Intent(this, SettingsActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
