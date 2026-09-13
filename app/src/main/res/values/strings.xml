@@ -75,7 +75,7 @@
     <!-- 抽屉守卫（可选的无障碍功能，默认关闭；卡片仅 Android 12+ 显示） -->
     <!-- 下面两条是系统无障碍设置页里展示的名称与说明，写给要决定“要不要授予这个权限”的人看 -->
     <string name="guard_a11y_label">抽屉守卫</string>
-    <string name="guard_a11y_description">仅在触摸锁锁定屏幕期间生效：检测到通知栏或控制中心被拉出时立即将其关闭，避免放在口袋或包里时误触到飞行模式等开关。本服务不读取任何界面内容，也不监听其它应用；未锁定时不做任何事。</string>
+    <string name="guard_a11y_description">仅在触摸锁锁定屏幕期间生效：通知栏或控制中心被拉出就立即关掉，避免放口袋时误触飞行模式等开关。不读取任何界面内容，也不监听其它应用；未锁定时不做任何事。</string>
 
     <string name="settings_guard_title">抽屉守卫（可选）</string>
     <string name="settings_guard_switch">锁定期间自动关闭下拉栏</string>
@@ -85,9 +85,9 @@
     <string name="settings_guard_go">去开启无障碍服务</string>
     <!-- 下面四条就是卡片正文：一行一件事，不再分小标题 -->
     <string name="settings_guard_diff_off">不开：锁定时通知栏照样能下拉、能点通知解锁；但口袋里的误触可能点中飞行模式等开关。</string>
-    <string name="settings_guard_diff_on">开启：抽屉一拉出就被关掉，误触风险基本消除；代价是要授予无障碍权限（系统会弹强警告；本应用只监听系统界面的窗口事件，读不到界面内容），且「点通知解锁」失效，只剩滑块。</string>
+    <string name="settings_guard_diff_on">开启：抽屉一拉出就被关掉，误触风险基本消除；代价是要授予无障碍权限（系统会弹强警告；只监听系统界面，读不到界面内容），且「点通知解锁」失效，只剩滑块。锁定期间每 0.5 秒兜底关一次，有少量额外耗电。</string>
     <string name="settings_guard_diff_same">两种都拦不住上滑回桌面与侧滑返回 —— 系统手势不经过应用层。</string>
-    <string name="settings_guard_tip">Android 13+ 若被「受限设置」拦住：设置 &gt; 应用 &gt; 触摸锁 &gt; 右上角菜单 &gt; 允许受限设置。效果因系统而异，装好后自己下拉验证一次。</string>
+    <string name="settings_guard_tip">Android 13+ 若被「受限设置」拦住：设置 &gt; 应用 &gt; 触摸锁 &gt; 右上角菜单 &gt; 允许受限设置。效果因系统而异，装好后自己下拉验证一次（快速甩动、缓慢下拉都试）。</string>
 
     <string name="settings_limit_title">能力边界</string>
     <string name="settings_limit_body">可拦截：屏幕内的普通触摸、返回键。\n无法拦截：上滑回桌面、上滑任务中心、侧滑返回手势、音量键、电源键。\n下拉通知栏：默认拦不住；打开上方的「抽屉守卫」后，锁定期间抽屉会被立即关闭（需 Android 12 及以上，且需授予无障碍权限）。\n原因：系统界面窗口层级高于应用悬浮窗，且全面屏手势由系统直接消费、不产生按键事件，应用层没有可用接口。详见项目 README。</string>

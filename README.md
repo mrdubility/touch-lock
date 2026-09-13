@@ -43,17 +43,17 @@
 
 拦不住的那些属于系统自己的手势和按键，优先级高于任何应用，第三方应用没有接口可以阻止。所以触摸锁适合防误触、防乱点，**不能当作防别人进系统、防窥的锁**。想要那种效果得用系统的「屏幕固定」或企业设备的 Kiosk 模式，本项目没走那条路 —— 那需要占一个前台 Activity，就没法让原来的应用继续显示在最上层了。
 
-**抽屉守卫（可选，默认关闭）**：设置页里那个开关用无障碍权限做一件事 —— 锁定期间检测到抽屉被拉出就立刻把它关掉，避免放在口袋或包里时误触到飞行模式、Wi-Fi、录屏这类开关。需要 Android 12 及以上，需你到系统设置里亲手启用；启用后「点通知解锁」会同时失效，解锁只剩滑块。**上滑回桌面依旧拦不住** —— 系统手势不经过应用层，无障碍只能事后关抽屉。开与不开的完整代价写在设置页那张卡片里，用不用由你定。
+**抽屉守卫（可选，默认关闭）**：设置页里那个开关用无障碍权限做一件事 —— 锁定期间抽屉一被拉出就立刻把它关掉，避免放在口袋或包里时误触到飞行模式、Wi-Fi、录屏这类开关。关抽屉靠两条路径：SystemUI 的窗口事件（快速甩动当场响应），加上锁定期间每 0.5 秒的定时兜底（缓慢下拉时面板跟着手指逐帧展开，系统不发窗口事件，只能靠它）。需要 Android 12 及以上，需你到系统设置里亲手启用；启用后「点通知解锁」会同时失效，解锁只剩滑块。**上滑回桌面依旧拦不住** —— 系统手势不经过应用层，无障碍只能事后关抽屉。开与不开的完整代价写在设置页那张卡片里，用不用由你定。
 
 ## 隐私
 
 不联网、不采集数据、没有广告。默认只申请 manifest 里的四项权限：悬浮窗、前台服务（含 targetSdk 34 要求的 `specialUse` 类型声明）、通知。调暗是靠自身窗口的参数，不改系统亮度设置，解锁后自动恢复。
 
-可选的「抽屉守卫」会多一个无障碍服务，由你在系统设置里亲手启用，不启用就完全不生效。它的能力在 `app/src/main/res/xml/shade_guard_service.xml` 里压到了最小：只监听系统界面（`com.android.systemui`）的窗口状态事件，`canRetrieveWindowContent=false`（读不到任何界面内容），不注入手势，且只在锁定期间动作。部分机型的控制中心是独立窗口，关抽屉的专用动作对它无效，此时会补发一次返回键 —— 锁定期间返回键本来就被覆盖层吞掉，所以对底层应用没影响。即便如此，无障碍仍是 Android 上最高的应用权限之一（系统会弹强警告），介意的人不要开。
+可选的「抽屉守卫」会多一个无障碍服务，由你在系统设置里亲手启用，不启用就完全不生效。它的能力在 `app/src/main/res/xml/shade_guard_service.xml` 里压到了最小：只监听系统界面（`com.android.systemui`）的窗口状态事件，`canRetrieveWindowContent=false`（读不到任何界面内容），不注入手势，且只在锁定期间动作。部分机型的控制中心是独立窗口，关抽屉的专用动作对它无效，此时会补发一次返回键 —— 锁定期间返回键本来就被覆盖层吞掉，所以对底层应用没影响。定时兜底走的是“无条件关一次”而不是先查窗口列表再决定：`getWindows()` 要求同时开 `flagRetrieveInteractiveWindows` 与 `canRetrieveWindowContent=true`，那等于为了一个兜底放弃上面这条最小化（能读到通知正文），代价不对等；而无条件关是安全的，抽屉没开时它是空操作。即便如此，无障碍仍是 Android 上最高的应用权限之一（系统会弹强警告），介意的人不要开。
 
 ## 版本
 
-- **1.4.0**（待发布）：新增可选的「抽屉守卫」—— 锁定期间检测到通知栏 / 控制中心被拉出就立即关闭，解决放口袋里误触飞行模式等开关的问题。需 Android 12+ 与无障碍权限，默认关闭，设置页写清了开与不开的代价。
+- **1.4.0**（待发布）：新增可选的「抽屉守卫」—— 锁定期间通知栏 / 控制中心被拉出就立即关闭，解决放口袋里误触飞行模式等开关的问题。需 Android 12+ 与无障碍权限，默认关闭，设置页写清了开与不开的代价。
 - **1.3.2**：按住点亮亮得更快。原先要等满系统默认 500ms 长按阈值，且亮度交回系统当前值（自动亮度在暗环境里本来就低、还会缓慢爬升），所以又慢又不亮；现在按住 200ms 即点亮、开始拖动当场点亮，目标亮度改为显式最亮。
 - **1.3.1**：点完磁贴自动收起下拉栏（之前面板会挂在锁屏之上，看着像没锁上）。
 - **1.3**：新增下拉栏快捷磁贴；倒计时最长 30 秒；设置页说明如何再次进入。
@@ -66,4 +66,4 @@
 - **构建**：JDK 17 + Android SDK 34（build-tools 34.0.0）。仓库未提交 `gradle-wrapper.jar`，本机用 `gradle assembleDebug` 或 Android Studio 直接构建。
 - **发版**：版本号只写在 `app/build.gradle.kts`（`versionCode` 递增以允许覆盖安装，`versionName` 是人读的版本号）；标签名决定 Release 标题与产物名 `touch-lock-<tag>-release.apk`。改完提交后打标签推送：`git tag -a v1.4.0 -m "..." && git push origin v1.4.0`。CI 会构建 release、用 `apksigner` 校验签名并把证书 SHA-256 与 `RELEASE_CERT_SHA256.txt` 比对（不一致拒绝发布），最后自动发布 Release 并附上 APK。push main 也会构建并正式签名 release 包，但只停在 Actions 产物里（保留 14 天，需登录下载），不创建 Release —— 用来先跑真机，而且它能直接覆盖安装在已发版本之上（debug 包签名不同，做不到这一点）。
 - **签名密钥**：`keystore/` 整个目录被 `.gitignore` 忽略，密钥库与密码只存在本机，CI 靠 GitHub Secrets（`KEYSTORE_BASE64`、`KEYSTORE_PASSWORD`）还原。**务必自行备份 keystore 和密码**：一旦丢失，老用户无法覆盖升级，只能卸载重装。
-- **代码**：Kotlin，零 AndroidX 依赖（仅平台 API + Kotlin stdlib），源码在 `app/src/main/java/com/touchlock/`。锁定层是 `TYPE_APPLICATION_OVERLAY` 全宽覆盖层，触摸在 `dispatchTouchEvent` 层消费、返回键被吞；前台服务用 `specialUse` 类型以免被厂商 ROM 识别为锁屏类强杀。抽屉守卫是独立的 `ShadeGuardService`（`AccessibilityService`），锁定状态通过 `TouchLockService.isLocked` 进程内共享，不做服务绑定；它的热路径只读本地值，不跳系统服务。
+- **代码**：Kotlin，零 AndroidX 依赖（仅平台 API + Kotlin stdlib），源码在 `app/src/main/java/com/touchlock/`。锁定层是 `TYPE_APPLICATION_OVERLAY` 全宽覆盖层，触摸在 `dispatchTouchEvent` 层消费、返回键被吞；前台服务用 `specialUse` 类型以免被厂商 ROM 识别为锁屏类强杀。抽屉守卫是独立的 `ShadeGuardService`（`AccessibilityService`），锁定状态通过 `TouchLockService.isLocked` 进程内共享，不做服务绑定；它的热路径只读本地值，不跳系统服务。锁定期间还有一个 500ms 的 `Handler` 定时器无条件关一次抽屉，为什么不用 `getWindows()` 先查再关写在 `pollRunnable` 的注释里。

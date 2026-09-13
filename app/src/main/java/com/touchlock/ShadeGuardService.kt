@@ -5,12 +5,14 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.ComponentName
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityManager
 
 /**
- * 抽屉守卫（可选功能，默认关闭）：锁定期间检测到通知栏 / 控制中心被拉出，立即把它关掉。
+ * 抽屉守卫（可选功能，默认关闭）：锁定期间发现通知栏 / 控制中心被拉出，立即把它关掉。
  *
  * 解决的是“放口袋挂机时误触抽屉里的开关”：飞行模式、Wi-Fi、录屏之类点一下就断网。
  * 覆盖层盖不住抽屉（TYPE_NOTIFICATION_SHADE 层级在 TYPE_APPLICATION_OVERLAY 之上），
@@ -27,21 +29,65 @@ import android.view.accessibility.AccessibilityManager
  *
  * 权限面刻意压到最小：xml 配置里 canRetrieveWindowContent=false，本服务读不到任何界面内容，
  * 只能收到“哪个包的窗口状态变了”这一层元数据；也不声明 canPerformGestures，不注入手势。
+ * 正因为读不到窗口，[pollRunnable] 只能无条件地关，不能先查再关 —— 见那里的注释。
  *
- * 检测只认 packageName == com.android.systemui，不认 className：各 ROM 的抽屉类名完全不同
- * （AOSP 是 NotificationPanelView，MIUI 是 MiuiNotificationPanelView），而 SystemUI 的包名
- * 各家都叫 com.android.systemui。误报的代价很低 —— 抽屉没开时这个 global action 是空操作，
- * 音量条、截屏动画等其它 SystemUI 窗口触发一次也无副作用。
+ * 动手有两条路径：事件（快，甩动当场响应）+ 定时兜底（慢，见 [pollRunnable]，补事件抓不到的缓慢下拉）。
  */
 class ShadeGuardService : AccessibilityService() {
 
     /** 上次动手的时间（uptimeMillis），用于 [ACTION_THROTTLE_MS] 节流 */
     private var lastActionAt = 0L
 
+    private val handler = Handler(Looper.getMainLooper())
+
+    /**
+     * 定时兜底：锁定期间无条件、周期性关一次抽屉。
+     *
+     * 为什么必须“无条件”而不是先检测再关：实测快速甩动能被关掉、缓慢下拉却不会 ——
+     * 缓慢拖动时面板是跟着手指逐帧展开的，系统不发 TYPE_WINDOW_STATE_CHANGED，
+     * 事件驱动这条路径对慢拖天生是瞎的。想改成主动查询 getWindows() 里的窗口焦点，
+     * 但该 API 要求同时开 flagRetrieveInteractiveWindows 与 canRetrieveWindowContent=true，
+     * 否则返回空列表 —— 等于为了兜底把权限面放大到能读通知正文，得不偿失。
+     *
+     * 而无条件恰恰是安全的：
+     * - DISMISS_NOTIFICATION_SHADE 在抽屉没开时是空操作；
+     * - BACK 在锁定期间落不到底层应用 —— 覆盖层窗口可聚焦，LockRootLayout.dispatchKeyEvent
+     *   直接吞掉返回键，它只会打到抽屉 / 控制中心自己身上。
+     * 所以不需要知道抽屉开没开：开着就关掉，没开就什么也不发生。
+     *
+     * 副作用：慢拖过程中抽屉可能被反复关掉又拉出（手指还按着，ROM 可能让面板继续跟手），
+     * 松手后就停住了。这正是本方案想要的 —— 抽屉停不住，误触开关的前提就不存在。
+     *
+     * 代价：锁定期间每 [POLL_INTERVAL_MS] 两次 performGlobalAction，挂机一小时约 1.4 万次跨进程
+     * 调用。未锁定时 [guardArmed] 读一个 volatile 布尔就返回，不产生任何跨进程调用。
+     */
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            try {
+                if (guardArmed()) dismissShade()
+            } finally {
+                // 放 finally：即使上面抛了异常也要继续排下一轮，否则守卫会静默死掉
+                handler.postDelayed(this, POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        handler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
+    }
+
+    override fun onDestroy() {
+        handler.removeCallbacks(pollRunnable)
+        super.onDestroy()
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        // 热路径上的判断全部是本地读值，不查系统服务：这个回调在锁定期间可能很密集
-        if (!SUPPORTED || !Prefs.shadeGuardEnabled(this) || !TouchLockService.isLocked) return
+        if (!guardArmed()) return
+        // 检测只认 packageName，不认 className：各 ROM 的抽屉类名完全不同（AOSP 是
+        // NotificationPanelView，MIUI 是 MiuiNotificationPanelView），而 SystemUI 的包名各家一致。
+        // 误报代价很低：抽屉没开时这个 global action 是空操作，音量条、截屏动画触发一次也无副作用。
         if (event.packageName?.toString() != SYSTEMUI_PACKAGE) return
         dismissShade()
     }
@@ -49,6 +95,13 @@ class ShadeGuardService : AccessibilityService() {
     override fun onInterrupt() {
         // 本服务不朗读、不震动，没有需要中断的反馈
     }
+
+    /**
+     * 三个条件同时成立才能动手，缺一不可（见类注释）。
+     * 顺序按代价排：静态常量 -> volatile 布尔 -> SharedPreferences（首次加载后是内存 map 查询）。
+     */
+    private fun guardArmed(): Boolean =
+        SUPPORTED && TouchLockService.isLocked && Prefs.shadeGuardEnabled(this)
 
     /**
      * 关闭抽屉，分两步：
@@ -59,8 +112,9 @@ class ShadeGuardService : AccessibilityService() {
      *    误发也无害：锁定期间覆盖层窗口持有焦点，而 LockRootLayout.dispatchKeyEvent
      *    会吞掉返回键，事件不会落到底层应用 —— 也就是说锁定期间返回键本来就是失效的。
      *
-     * 节流的原因：音量条、截屏动画、横幅通知等 SystemUI 窗口也会触发本回调，
-     * 它们并不需要任何动作；抽屉被关掉的过程本身也会再发一次窗口事件。
+     * 节流的原因：音量条、截屏动画、横幅通知等 SystemUI 窗口也会触发事件回调，抽屉被关掉的
+     * 过程本身还会再发一次窗口事件，[pollRunnable] 也可能紧跟在一次事件之后到点。
+     * 有了节流，这些都会合并成一次动作。
      */
     private fun dismissShade() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
@@ -81,8 +135,15 @@ class ShadeGuardService : AccessibilityService() {
         /**
          * 两次动作的最小间隔。取 300ms：比抽屉展开动画短（不会漏掉紧接着拉出的控制中心），
          * 又能把口袋里的连续摩擦、以及我们自己关掉抽屉引发的后续事件压成一次。
+         * 必须小于 [POLL_INTERVAL_MS]，否则定时兜底会被自己上一次的动作节流掉。
          */
         private const val ACTION_THROTTLE_MS = 300L
+
+        /**
+         * 定时兜底的间隔。取 500ms：缓慢下拉通常持续一秒以上，这个间隔能在手指还按着的时候
+         * 就把抽屉关掉；再密收益不大（一次就是两次跨进程调用，挂机场景一锁就是几十分钟）。
+         */
+        private const val POLL_INTERVAL_MS = 500L
 
         /**
          * 功能是否真正生效：系统版本支持 + 用户在设置页打开 + 系统里启用了本服务。
