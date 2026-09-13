@@ -73,26 +73,16 @@ jobs:
           java -version
           gradle --version
 
-      - name: Assemble debug APK
-        run: |
-          set -euo pipefail
-          gradle --no-daemon assembleDebug --stacktrace --console=plain 2>&1 | tee /tmp/gradle-debug.log
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: touch-lock-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
-
-      # ============ 以下步骤 main 推送与 v* 标签推送都执行 ============
-      # 条件：github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      # ============ 从这里开始是签名链路 ============
+      # 除下面的 Assemble release APK 外，各步骤的条件都是：
+      #   github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
       # main 也跑一遍正式签名，是为了得到一个“能直接覆盖安装、但不会发布出去”的自测包：
-      # debug 包用的是默认 debug keystore，与 release 包签名不同，装之前必须先卸载、
+      # 本地编的 debug 包用的是默认 debug keystore，与 release 包签名不同，装之前必须先卸载、
       # 还会丢掉已存设置；用同一把正式密钥签的包就没这个麻烦。
-      # 该条件对 pull_request 自动不成立（其 github.ref 是 refs/pull/N/merge），
-      # 所以来自 fork 的 PR（本就拿不到 Secrets）不会因为这些步骤而失败。
+      # 所以 CI 不再另外编一份 debug 产物（曾经有，已删）：源码与 release 完全相同、两边都不开
+      # 混淆，多编一份只是白等一遍编译、多一个没人用的包；PR 上的编译校验则由下面那次 assembleRelease 担。
+      # 上述条件对 pull_request 自动不成立（其 github.ref 是 refs/pull/N/merge），所以来自 fork 的
+      # PR（本就拿不到 Secrets）不会因为签名这几步而失败，它只会跑到下面那次编译为止。
       # 签名密钥不入库：由 GitHub Secrets 提供，临时还原到 runner 上，用完随虚拟机一起销毁
 
       - name: Restore release keystore from secrets
@@ -115,8 +105,10 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "keystore 已还原：$(wc -c < "$RUNNER_TEMP/keystore/touch-lock-release.jks") bytes"
 
-      - name: Assemble signed release APK
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+      # 全仓库唯一一次编译，所有事件都跑（含 pull_request）：删掉 debug 后它就是 PR 上仅有的编译校验。
+      # PR 拿不到 Secrets，此时 build.gradle.kts 只打一行提示并产出未签名 APK（只有显式给了
+      # KEYSTORE_FILE 却读不到材料才抛异常）；未签名的包不上传也不验签，所以不会误伤来自 fork 的 PR。
+      - name: Assemble release APK
         run: |
           set -euo pipefail
           gradle --no-daemon assembleRelease --stacktrace --console=plain 2>&1 | tee /tmp/gradle-release.log
@@ -208,7 +200,9 @@ jobs:
         run: |
           set +e
           log=/tmp/gradle-release.log
-          if [ ! -s "$log" ]; then log=/tmp/gradle-debug.log; fi
+          # 现在只剩 release 这一份 gradle 日志；挂得比 gradle 还早（装 SDK 等步骤）就补一行说明，
+          # 免得摘要评论里什么都没有，只能回到 Actions 页面盲查
+          if [ ! -s "$log" ]; then echo 'failed before gradle produced any log' > "$log"; fi
           {
             echo "### CI failure digest"
             echo "run=${GITHUB_RUN_ID} ref=${GITHUB_REF_NAME} sha=${GITHUB_SHA}"
