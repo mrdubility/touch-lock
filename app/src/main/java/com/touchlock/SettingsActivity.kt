@@ -190,12 +190,12 @@ class SettingsActivity : Activity() {
         resIds.joinToString("\n") { getString(it) }
 
     /**
-     * 跳系统无障碍设置页。EXTRA_FRAGMENT_ARG_KEY 能让原生系统直接定位到本服务那一项；
+     * 跳系统无障碍设置页。带上 fragment arg key 能让原生系统直接定位到本服务那一项；
      * 定制系统不认这个 extra 时退化成普通列表页，用户自己找「抽屉守卫」。
      */
     private fun openAccessibilitySettings() {
         val target = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).putExtra(
-            Settings.EXTRA_FRAGMENT_ARG_KEY,
+            FRAGMENT_ARG_KEY,
             ComponentName(this, ShadeGuardService::class.java).flattenToString()
         )
         runCatching { startActivity(target) }
@@ -223,5 +223,14 @@ class SettingsActivity : Activity() {
 
     companion object {
         private const val REQ_NOTIFICATION = 100
+
+        /**
+         * 系统设置页用来定位并高亮某一项的 extra key。
+         *
+         * AOSP 里它就是 Settings.EXTRA_FRAGMENT_ARG_KEY，但那个常量标了 @hide，
+         * 公开 SDK 里拿不到（直接引用会报 Unresolved reference），只能写字面值 ——
+         * 与本项目此前踩过的 SCREEN_BRIGHTNESS_DEFAULT 同一类坑。
+         */
+        private const val FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
     }
 }
