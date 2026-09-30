@@ -29,8 +29,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TouchLock">
 
+        <!--
+          excludeFromRecents=true：不把本应用的任务显示在“最近任务”里，
+          避免用户在多任务界面误划清除导致进程被杀、连带关掉前台锁定服务与
+          无障碍抽屉守卫。只影响最近任务可见性，不改变任何运行逻辑。
+        -->
         <activity
             android:name=".MainActivity"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -49,6 +55,7 @@
         -->
         <activity
             android:name=".SettingsActivity"
+            android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/settings_title" />
 
