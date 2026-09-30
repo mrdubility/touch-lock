@@ -25,8 +25,51 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # 需要 before..after 差异来判断本次 main push 是不是只改了文档；
+          # 仓库历史体量小，全量拉取不拖速度。
+          fetch-depth: 0
+
+      # 纯文档改动的 main push：只改了 *.md（比如 README），就没必要跑一遍
+      # 构建/签名/上传，白等几分钟。tag 推送（发版触发）与 PR 推送（编译校验）
+      # 一律照常。下面每一步都带 `steps.changes.outputs.only_docs != 'true'`：
+      #   非 main push 时本步自身跳过，outputs 为空字符串，`'' != 'true'` 成立，
+      #   后续步骤按原条件执行；main push 命中纯文档时 outputs 为 'true'，后续全跳。
+      - name: Detect docs-only change on main push
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: changes
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          after="${GITHUB_SHA}"
+          if [ -z "$before" ] || printf '%s' "$before" | grep -qE '^0+$'; then
+            echo 'no usable baseline (new branch / force push); running full build'
+            echo 'only_docs=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git cat-file -e "${before}^{commit}" 2>/dev/null; then
+            echo 'before commit missing in history (rewritten by force push); running full build'
+            echo 'only_docs=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only "$before" "$after")
+          echo 'changed files:'
+          if [ -n "$changed" ]; then printf '%s\n' "$changed"; else echo '(empty)'; fi
+          if [ -z "$changed" ]; then
+            echo 'empty diff; skip build'
+            echo 'only_docs=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s\n' "$changed" | grep -vqE '\.md$'; then
+            echo 'non-doc changes present; running full build'
+            echo 'only_docs=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'all changes are Markdown only; skip build'
+            echo 'only_docs=true' >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up JDK 17
+        if: steps.changes.outputs.only_docs != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -34,6 +77,7 @@ jobs:
 
       # AGP 8.5.2 需要 compileSdk 34 / Build-Tools 34.0.0
       - name: Set up Android SDK
+        if: steps.changes.outputs.only_docs != 'true'
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
@@ -41,6 +85,7 @@ jobs:
       # 本仓库未提交 gradle-wrapper.jar，因此不使用 ./gradlew，
       # 改为安装 gradle-wrapper.properties 声明的同一版本，保持单一事实来源。
       - name: Resolve Gradle version
+        if: steps.changes.outputs.only_docs != 'true'
         id: gradle-version
         run: |
           set -euo pipefail
@@ -50,6 +95,7 @@ jobs:
           echo "使用 Gradle $v"
 
       - name: Install Gradle
+        if: steps.changes.outputs.only_docs != 'true'
         env:
           GRADLE_VERSION: ${{ steps.gradle-version.outputs.version }}
         run: |
@@ -59,6 +105,7 @@ jobs:
           echo "$HOME/gradle-dist/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
 
       - name: Cache Gradle dependencies
+        if: steps.changes.outputs.only_docs != 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -69,24 +116,29 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Show toolchain
+        if: steps.changes.outputs.only_docs != 'true'
         run: |
           java -version
           gradle --version
 
       # ============ 从这里开始是签名链路 ============
-      # 除下面的 Assemble release APK 外，各步骤的条件都是：
-      #   github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-      # main 也跑一遍正式签名，是为了得到一个“能直接覆盖安装、但不会发布出去”的自测包：
-      # 本地编的 debug 包用的是默认 debug keystore，与 release 包签名不同，装之前必须先卸载、
-      # 还会丢掉已存设置；用同一把正式密钥签的包就没这个麻烦。
+      # 除下面的 Assemble release APK 外，各步骤的 if 条件形如：
+      #   (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+      #     && steps.changes.outputs.only_docs != 'true'
+      # 前半段：main 与 tag 都跑一遍正式签名，是为了得到一个“能直接覆盖安装、但不会
+      # 发布出去”的自测包：本地编的 debug 包用的是默认 debug keystore，与 release 包签名
+      # 不同，装之前必须先卸载、还会丢掉已存设置；用同一把正式密钥签的包就没这个麻烦。
+      # PR 事件里 github.ref 是 refs/pull/N/merge，前半段自动不成立，所以来自 fork 的 PR
+      # （本就拿不到 Secrets）不会因签名这几步失败，只会跑到下面那次编译为止。
+      # 后半段：main push 若只改了 *.md（上面 changes 步会打成 only_docs=true），三步一起
+      # 跳过；tag 事件里 changes 步自身被跳过，其 outputs 是空串，`'' != 'true'` 成立，
+      # 发版路径完全不受影响。
       # 所以 CI 不再另外编一份 debug 产物（曾经有，已删）：源码与 release 完全相同、两边都不开
       # 混淆，多编一份只是白等一遍编译、多一个没人用的包；PR 上的编译校验则由下面那次 assembleRelease 担。
-      # 上述条件对 pull_request 自动不成立（其 github.ref 是 refs/pull/N/merge），所以来自 fork 的
-      # PR（本就拿不到 Secrets）不会因为签名这几步而失败，它只会跑到下面那次编译为止。
       # 签名密钥不入库：由 GitHub Secrets 提供，临时还原到 runner 上，用完随虚拟机一起销毁
 
       - name: Restore release keystore from secrets
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.changes.outputs.only_docs != 'true'
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -108,14 +160,16 @@ jobs:
       # 全仓库唯一一次编译，所有事件都跑（含 pull_request）：删掉 debug 后它就是 PR 上仅有的编译校验。
       # PR 拿不到 Secrets，此时 build.gradle.kts 只打一行提示并产出未签名 APK（只有显式给了
       # KEYSTORE_FILE 却读不到材料才抛异常）；未签名的包不上传也不验签，所以不会误伤来自 fork 的 PR。
+      # main push 若只改 *.md（only_docs=true），本步跳过，不再白跑一次 assembleRelease。
       - name: Assemble release APK
+        if: steps.changes.outputs.only_docs != 'true'
         run: |
           set -euo pipefail
           gradle --no-daemon assembleRelease --stacktrace --console=plain 2>&1 | tee /tmp/gradle-release.log
 
       # 硬验签：万一签名链路静默失效（产出未签名 APK），在此处直接失败而不是发到 Release 上
       - name: Verify release APK signature
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.changes.outputs.only_docs != 'true'
         run: |
           set -euo pipefail
           apk=app/build/outputs/apk/release/app-release.apk
@@ -146,7 +200,7 @@ jobs:
 
       # main 与 tag 共用同一个产物名：具体是哪个版本看运行页上的 ref 与提交即可
       - name: Upload release APK
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) && steps.changes.outputs.only_docs != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: touch-lock-release-apk
